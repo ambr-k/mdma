@@ -12,3 +12,8 @@ Cargo.lock
 
 # MSVC Windows builds of rustc generate these, which store debugging information
 *.pdb
+
+static/styles.css
+node_modules
+.env
+Secrets.toml

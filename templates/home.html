@@ -1,0 +1,15 @@
+{% extends "base.layout.html" %}
+
+{% block body %}
+<header class="navbar">
+    <button class="btn btn-neutral" hx-get="admin/users/list.hx" hx-swap="innerHtml" hx-target="main">
+        Users List
+    </button>
+</header>
+<main>
+    <a class="btn btn-neutral"
+        href="https://accounts.google.com/o/oauth2/v2/auth?scope=openid%20email&client_id={{ oauth_id }}&response_type=code&redirect_uri={{ oauth_redirect }}">
+        Sign In
+    </a>
+</main>
+{% endblock %}
