@@ -1,29 +1,32 @@
 use askama_axum::IntoResponse;
 use axum::{
-    extract::{Query, State},
-    http::{header::SET_COOKIE, HeaderValue, StatusCode},
+    extract::{Query, Request, State},
+    http::StatusCode,
+    middleware::Next,
     response::{Redirect, Response},
 };
+use axum_extra::extract::{cookie::Cookie, CookieJar};
+use jsonwebtoken::Validation;
 use oauth2::{
     basic::BasicClient, AuthUrl, AuthorizationCode, ClientId, ClientSecret, CsrfToken, RedirectUrl,
     Scope, TokenResponse, TokenUrl,
 };
 use serde::{Deserialize, Serialize};
-use time::OffsetDateTime;
+use time::Duration;
 
 use crate::AppState;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 struct AccountRecord {
     id: i32,
     email: String,
     is_admin: bool,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Jwt {
     account: AccountRecord,
-    exp: OffsetDateTime,
+    exp: u64,
 }
 
 pub fn oauth_client(client_id: String, client_secret: String, redirect_url: String) -> BasicClient {
@@ -66,8 +69,9 @@ pub async fn oauth_callback(
         secret_store,
         ..
     }): State<crate::AppState>,
+    cookies: CookieJar,
     Query(params): Query<OauthCallbackQuery>,
-) -> Result<Response, Response> {
+) -> Result<(CookieJar, Redirect), Response> {
     let token = google_oauth
         .exchange_code(AuthorizationCode::new(params.code))
         .request_async(oauth2::reqwest::async_http_client)
@@ -90,7 +94,7 @@ pub async fn oauth_callback(
         "INSERT INTO accounts (email) VALUES ($1) ON CONFLICT DO NOTHING",
         profile.email
     )
-    .fetch_one(&db_pool)
+    .execute(&db_pool)
     .await
     .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()).into_response())?;
 
@@ -107,7 +111,8 @@ pub async fn oauth_callback(
         &jsonwebtoken::Header::default(),
         &Jwt {
             account,
-            exp: OffsetDateTime::now_utc(),
+            exp: jsonwebtoken::get_current_timestamp()
+                + Duration::days(7).whole_seconds().unsigned_abs(),
         },
         &jsonwebtoken::EncodingKey::from_secret(
             secret_store.get("SESSION_JWT_SECRET").unwrap().as_bytes(),
@@ -115,12 +120,46 @@ pub async fn oauth_callback(
     )
     .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()).into_response())?;
 
-    let mut resp = Redirect::to("/").into_response();
-    resp.headers_mut().append(
-        SET_COOKIE,
-        HeaderValue::from_str(format!("jwt={}", jwt).as_str())
-            .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()).into_response())?,
-    );
+    Ok((cookies.add(Cookie::new("jwt", jwt)), Redirect::to("/")))
+}
 
-    Ok(resp)
+pub async fn verify_admin(
+    State(AppState { secret_store, .. }): State<crate::AppState>,
+    cookies: CookieJar,
+    mut req: Request,
+    next: Next,
+) -> Result<Response, Response> {
+    let jwt = cookies
+        .get("jwt")
+        .ok_or(StatusCode::UNAUTHORIZED.into_response())?
+        .value();
+
+    println!("{jwt}");
+
+    let claims = jsonwebtoken::decode::<Jwt>(
+        jwt,
+        &jsonwebtoken::DecodingKey::from_secret(
+            secret_store.get("SESSION_JWT_SECRET").unwrap().as_bytes(),
+        ),
+        &Validation::default(),
+    )
+    .map_err(|err| {
+        (
+            cookies.to_owned().remove("jwt"),
+            (StatusCode::UNAUTHORIZED, err.to_string()),
+        )
+            .into_response()
+    })?
+    .claims;
+
+    if !claims.account.is_admin {
+        return Err((StatusCode::FORBIDDEN, "Not an admin").into_response());
+    }
+
+    req.extensions_mut().insert(claims);
+    Ok(next.run(req).await)
+}
+
+pub async fn signout(cookies: CookieJar) -> (CookieJar, Redirect) {
+    return (cookies.remove("jwt"), Redirect::to("/"));
 }

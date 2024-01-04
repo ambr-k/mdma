@@ -2,14 +2,21 @@
 
 {% block body %}
 <header class="navbar">
+    {% if signed_in %}
+
     <button class="btn btn-neutral" hx-get="admin/users/list.hx" hx-swap="innerHtml" hx-target="main">
         Users List
     </button>
-</header>
-<main>
-    <a class="btn btn-neutral"
-        href="https://accounts.google.com/o/oauth2/v2/auth?scope=openid%20email&client_id={{ oauth_id }}&response_type=code&redirect_uri={{ oauth_redirect }}">
+    <a class="btn btn-neutral" href="/signout">
+        Sign Out
+    </a>
+
+    {% else %}
+    <a class="btn btn-neutral" href="/signin">
         Sign In
     </a>
+    {% endif %}
+</header>
+<main>
 </main>
 {% endblock %}

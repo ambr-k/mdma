@@ -9,6 +9,8 @@ edition = "2021"
 askama = { version = "0.12.1", features = ["with-axum"] }
 askama_axum = "0.4.0"
 axum = "0.7.1"
+axum-extra = { version = "0.9.1", features = ["cookie"] }
+hex = "0.4.3"
 hmac = "0.12.1"
 jsonwebtoken = "9.2.0"
 oauth2 = "4.4.2"

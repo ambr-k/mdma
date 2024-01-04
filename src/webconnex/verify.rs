@@ -42,7 +42,7 @@ pub async fn ver_sig(
         })?
         .as_bytes();
 
-    hmac.verify_slice(signature)
+    hmac.verify_slice(hex::decode(signature).unwrap().as_slice())
         .map_err(|err| (StatusCode::UNAUTHORIZED, err.to_string()).into_response())?;
 
     Ok(next

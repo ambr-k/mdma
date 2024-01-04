@@ -10,9 +10,9 @@ pub struct ResponseBody {
 
 pub async fn webhook_handler(
     State(state): State<crate::AppState>,
-    Json(body): Json<RequestPayload>,
+    Json(RequestPayload { data: event }): Json<RequestPayload>,
 ) -> Result<axum::Json<ResponseBody>, Response> {
-    let insert_response = insert_transaction(&body, &state).await?;
+    let insert_response = insert_transaction(&event, &state).await?;
 
     Ok(Json(ResponseBody {
         member_id: insert_response.member_id,

@@ -1,8 +1,9 @@
 use askama::Template;
-use axum::{extract::State, routing::get, Router};
+use axum::{routing::get, Router};
+use axum_extra::extract::CookieJar;
 use shuttle_runtime::CustomError;
 use shuttle_secrets::SecretStore;
-use tower_http::{services::ServeDir, trace::TraceLayer};
+use tower_http::services::ServeDir;
 mod admin;
 mod auth;
 mod webconnex;
@@ -19,15 +20,13 @@ struct AppState {
 #[template(path = "home.html")]
 struct HomeTemplate<'a> {
     title: &'a str,
-    oauth_id: String,
-    oauth_redirect: String,
+    signed_in: bool,
 }
 
-async fn home(State(state): State<AppState>) -> HomeTemplate<'static> {
+async fn home(cookies: CookieJar) -> HomeTemplate<'static> {
     HomeTemplate {
         title: "Home",
-        oauth_id: state.secret_store.get("GOOGLE_OAUTH_CLIENT_ID").unwrap(),
-        oauth_redirect: state.secret_store.get("GOOGLE_OAUTH_REDIRECT").unwrap(),
+        signed_in: cookies.get("jwt").is_some(),
     }
 }
 
@@ -61,12 +60,12 @@ async fn main(
     let router = Router::new()
         .route("/", get(home))
         .route("/signin", get(auth::signin_redirect))
+        .route("/signout", get(auth::signout))
         .route("/callback-google", get(auth::oauth_callback))
         .with_state(state.clone())
         .nest("/admin", admin::router(state.clone()))
         .nest("/.webconnex", webconnex::router(state.clone()))
-        .nest_service("/assets", ServeDir::new("static"))
-        .layer(TraceLayer::new_for_http());
+        .nest_service("/assets", ServeDir::new("static"));
 
     Ok(router.into())
 }

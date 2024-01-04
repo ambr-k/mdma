@@ -1,5 +1,5 @@
 use askama::Template;
-use axum::{routing::get, Router};
+use axum::{middleware, routing::get, Router};
 
 mod users;
 
@@ -17,5 +17,9 @@ pub fn router(state: crate::AppState) -> Router {
     Router::new()
         .route("/", get(root))
         .route("/users/list.hx", get(users::users_list))
-        .with_state(state)
+        .with_state(state.clone())
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            crate::auth::verify_admin,
+        ))
 }

@@ -5,14 +5,16 @@ use self::verify::{ver_sig, VerifySigState};
 
 use askama_axum::IntoResponse;
 use axum::{
-    http::StatusCode, middleware::from_fn_with_state, response::Response, routing::get, Router,
+    http::StatusCode, middleware::from_fn_with_state, response::Response, routing::post, Router,
 };
 use rust_decimal::Decimal;
 use serde::Deserialize;
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct Event {}
+struct RequestPayload {
+    data: EventDetails,
+}
 
 #[derive(Deserialize)]
 struct Name {
@@ -30,15 +32,12 @@ struct Billing {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct RequestPayload {
+struct EventDetails {
     customer_id: i32,
     total: Decimal,
     billing: Billing,
     lookup_id: i32,
     transaction_id: i32,
-
-    #[serde(flatten)]
-    _event: Event,
 }
 
 struct InsertTransactionResponse {
@@ -47,7 +46,7 @@ struct InsertTransactionResponse {
 }
 
 async fn insert_transaction(
-    body: &RequestPayload,
+    body: &EventDetails,
     state: &crate::AppState,
 ) -> Result<InsertTransactionResponse, Response> {
     sqlx::query_as!(
@@ -86,12 +85,12 @@ pub fn router(state: crate::AppState) -> Router {
     Router::new()
         .route(
             "/new-member",
-            get(new_member::webhook_handler)
+            post(new_member::webhook_handler)
                 .route_layer(from_fn_with_state(new_member_ver_state, ver_sig)),
         )
         .route(
             "/payment-success",
-            get(recurring_payment_success::webhook_handler)
+            post(recurring_payment_success::webhook_handler)
                 .route_layer(from_fn_with_state(recurring_success_ver_state, ver_sig)),
         )
         .with_state(state)
