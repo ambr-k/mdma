@@ -1,0 +1,11 @@
+{% extends "base.layout.html" %}
+
+{% block body %}
+<header class="navbar">
+    <button class="btn btn-neutral" hx-get="admin/users/list.hx" hx-swap="innerHtml" hx-target="main">
+        Users List
+    </button>
+</header>
+<main>
+</main>
+{% endblock %}

@@ -1,0 +1,22 @@
+{% extends "base.layout.html" %}
+
+{% block body %}
+<header class="navbar">
+    {% if signed_in %}
+
+    <button class="btn btn-neutral" hx-get="admin/users/list.hx" hx-swap="innerHtml" hx-target="main">
+        Users List
+    </button>
+    <a class="btn btn-neutral" href="/signout">
+        Sign Out
+    </a>
+
+    {% else %}
+    <a class="btn btn-neutral" href="/signin">
+        Sign In
+    </a>
+    {% endif %}
+</header>
+<main>
+</main>
+{% endblock %}
