@@ -1,8 +1,7 @@
 use askama::Template;
 use axum::{routing::get, Router};
 use axum_extra::extract::CookieJar;
-use shuttle_runtime::CustomError;
-use shuttle_secrets::SecretStore;
+use shuttle_runtime::{CustomError, SecretStore};
 use tower_http::services::ServeDir;
 mod admin;
 mod auth;
@@ -33,7 +32,7 @@ async fn home(cookies: CookieJar) -> HomeTemplate<'static> {
 #[shuttle_runtime::main]
 async fn main(
     #[shuttle_shared_db::Postgres] db_pool: sqlx::PgPool,
-    #[shuttle_secrets::Secrets] secret_store: SecretStore,
+    #[shuttle_runtime::Secrets] secret_store: SecretStore,
 ) -> shuttle_axum::ShuttleAxum {
     sqlx::migrate!()
         .run(&db_pool)

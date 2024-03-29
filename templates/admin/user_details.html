@@ -1,0 +1,108 @@
+<div class="divider">
+    Member Details
+</div>
+
+<a class="btn btn-link" href="mailto:{{user.email}}">
+    {{user.email}}
+</a>
+
+{% if let Some(val) = user.consecutive_since_cached %}
+<p>Active since {{val}}</p>
+{% endif %}
+
+{% if let Some(val) = user.consecutive_until_cached %}
+<p>Active until {{val}}</p>
+{% endif %}
+
+<div class="divider">
+    Third-Party Accounts
+</div>
+
+{% if let Some(wc_users) = webconnex.data %}
+{% for wc_user in wc_users %}
+<a href="https://manage.webconnex.com/contacts/{{wc_user.id}}" target="_blank" class="btn btn-outline btn-primary">
+    GivingFuel ID {{wc_user.id}}
+</a>
+{% endfor %}
+{% endif %}
+
+<div class="divider">
+    Actions
+</div>
+
+<button class="btn btn-secondary btn-outline"
+    onclick="document.getElementById('modal_add_payment_{{user.id}}').showModal()">Add Payment</button>
+
+<!-- ADD PAYMENT -->
+<dialog id="modal_add_payment_{{user.id}}" class="modal modal-bottom sm:modal-middle">
+    <div class="modal-box">
+        <form method="dialog">
+            <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>
+        </form>
+        <h1 class="font-bold text-xl">Add Payment: {{user.first_name}} {{user.last_name}}</h1>
+        <h2 class="text-lg">{{user.email}}</h2>
+
+        <div class="form-response"></div>
+
+        <div class="divider"></div>
+
+        <form class="mt-3" hx-post="admin/user/{{user.id}}/payment" hx-target="previous .form-response">
+            <div class="form-control">
+                <label class="label cursor-pointer">
+                    <span class="label-text">Payment Method / Reason</span>
+                    <select name="payment_method" class="select select-primary" required>
+                        <option value="cash">Cash</option>
+                        <option value="card">Card</option>
+                        <option value="volunteer">Volunteering</option>
+                        <option value="grace-period">Grace Period</option>
+                        <option value="ethics-committee">Ethics Committee</option>
+                        <option value="exec-board">Executive Board</option>
+                        <option value="other">Other</option>
+                    </select>
+                </label>
+            </div>
+
+            <div class="form-control">
+                <label class="label cursor-pointer">
+                    <span class="label-text">Amount Paid</span>
+                    <input type="number" name="amount_paid" min="0" step="any" value="0.00" class="input input-bordered"
+                        required />
+                </label>
+            </div>
+
+            <div class="form-control">
+                <label class="label cursor-pointer">
+                    <span class="label-text">Effective On</span>
+                    <input type="date" name="effective_on" id="modal_add_payment_{{user.id}}__effective_on"
+                        class="input input-bordered" required />
+                    <script>
+                        document.getElementById("modal_add_payment_{{user.id}}__effective_on").valueAsDate = new Date();
+                    </script>
+                </label>
+            </div>
+
+            <div class="form-control">
+                <label class="label cursor-pointer">
+                    <span class="label-text">Duration (Months)</span>
+                    <input type="number" min="1" step="1" value="1" name="duration_months" class="input input-bordered"
+                        required />
+                </label>
+            </div>
+
+            <div class="form-control">
+                <label class="label cursor-pointer">
+                    <span class="label-text">Notes</span>
+                    <textarea class="textarea textarea-bordered" name="notes" placeholder="Notes"></textarea>
+                </label>
+            </div>
+
+            <div class="form-control">
+                <button class="btn btn-outline btn-primary w-1/2 mx-auto">SUBMIT</button>
+            </div>
+        </form>
+    </div>
+
+    <form method="dialog" class="modal-backdrop">
+        <button>CLOSE</button>
+    </form>
+</dialog>

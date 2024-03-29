@@ -1,14 +1,82 @@
-<table class="table table-zebra">
-    <thead>
-        <th>First Name</th>
-        <th>Last Name</th>
-        <th>Email</th>
-    </thead>
+<div id="users-list" class="w-full max-w-xl mx-auto">
+
+    <!-- SEARCH -->
+    <div class="collapse collapse-arrow bg-base-200 my-2 border border-secondary">
+        <input type="radio" name="users-list-accordion" checked />
+        <div class="collapse-title text-xl font-medium">
+            Search Members
+        </div>
+        <div class="collapse-content">
+            <form class="[&>*]:my-3" hx-get="admin/users" hx-swap="outerHTML" hx-target="#users-list">
+
+                <label class="input input-bordered flex items-center gap-2">
+                    <input type="text" name="search" class="grow bg-inherit" placeholder="Search" {% if let
+                        Some(val)=search %} value="{{val}}" {% endif %} />
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor"
+                        class="w-4 h-4 opacity-70">
+                        <path fill-rule="evenodd"
+                            d="M9.965 11.026a5 5 0 1 1 1.06-1.06l2.755 2.754a.75.75 0 1 1-1.06 1.06l-2.755-2.754ZM10.5 7a3.5 3.5 0 1 1-7 0 3.5 3.5 0 0 1 7 0Z"
+                            clip-rule="evenodd" />
+                    </svg>
+                </label>
+
+                <div class="form-control">
+                    <label class="label cursor-pointer">
+                        <span class="label-text">Active Members Only</span>
+                        <input type="checkbox" name="active_only" value="true" {% if active_only %}checked{%endif %}
+                            class="checkbox checkbox-primary" />
+                    </label>
+                </div>
+
+                <button class="btn btn-primary w-1/2 block mx-auto !mb-0">SEARCH</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- USER ROW -->
     {% for user in users %}
-    <tr>
-        <td>{{ user.first_name }}</td>
-        <td>{{ user.last_name }}</td>
-        <td>{{ user.email }}</td>
-    </tr>
+    <div class="collapse collapse-arrow bg-base-200 my-2">
+        <input type="radio" name="users-list-accordion" hx-get="admin/user/{{user.id}}" hx-indicator="closest .collapse"
+            hx-target="next .collapse-content" hx-swap="innerHTML" id="user_details_trigger_{{user.id}}" />
+        <div class="collapse-title text-xl font-medium">
+            {{user.last_name}}, {{user.first_name}}
+        </div>
+        <div class="collapse-content" id="user_details_{{user.id}}">
+            <progress class="progress htmx-indicator"></progress>
+        </div>
+    </div>
     {% endfor %}
-</table>
+
+    <div class="divider"></div>
+
+    <!-- PAGINATION -->
+    <div class="join join-vertical md:join-horizontal justify-center w-full items-center">
+        {% macro pagebtn(request_opt, text) %}
+        {% if let Some(request) = request_opt %}
+        <button class="btn btn-outline join-item w-1/4" hx-get="admin/users" hx-swap="outerHTML" hx-target="#users-list"
+            hx-vals='{
+                "count": {{request.count}},
+                "offset": {{request.offset}},
+                "active_only": {{active_only}}
+                {% if let Some(val) = search %}, "search": "{{val}}" {% endif %} }'>
+            {{ text }}
+        </button>
+        {% else %}
+        <button class="btn btn-outline join-item w-1/4" disabled>
+            {{ text }}
+        </button>
+        {% endif %}
+        {% endmacro %}
+
+        {% call pagebtn(prev, "Previous") %}
+
+        <div class="btn btn-outline join-item w-1/4 !text-neutral-content" disabled>
+            {{range.0}} - {{range.1}} of {{range.2}}
+        </div>
+
+        {% call pagebtn(next, "Next") %}
+    </div>
+
+</div>

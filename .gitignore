@@ -17,3 +17,6 @@ static/styles.css
 node_modules
 .env
 Secrets.toml
+Secrets.*.toml
+
+.sqlx/

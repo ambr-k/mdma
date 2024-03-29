@@ -2,8 +2,11 @@
 
 {% block body %}
 <header class="navbar">
-    <button class="btn btn-neutral" hx-get="admin/users/list.hx" hx-swap="innerHtml" hx-target="main">
+    <button class="btn btn-primary" hx-get="admin/users" hx-swap="innerHtml" hx-target="main">
         Users List
+    </button>
+    <button class="btn btn-warning btn-outline" hx-get="admin/bulk_update" hx-swap="innerHtml" hx-target="main">
+        Bulk Update
     </button>
 </header>
 <main>

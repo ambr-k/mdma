@@ -17,16 +17,16 @@ use time::Duration;
 use crate::AppState;
 
 #[derive(Serialize, Deserialize, Clone)]
-struct AccountRecord {
-    id: i32,
-    email: String,
-    is_admin: bool,
+pub struct AccountRecord {
+    pub id: i32,
+    pub email: String,
+    pub is_admin: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Jwt {
-    account: AccountRecord,
-    exp: u64,
+    pub account: AccountRecord,
+    pub exp: u64,
 }
 
 pub fn oauth_client(client_id: String, client_secret: String, redirect_url: String) -> BasicClient {
@@ -133,8 +133,6 @@ pub async fn verify_admin(
         .get("jwt")
         .ok_or(StatusCode::UNAUTHORIZED.into_response())?
         .value();
-
-    println!("{jwt}");
 
     let claims = jsonwebtoken::decode::<Jwt>(
         jwt,

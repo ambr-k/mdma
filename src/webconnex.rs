@@ -33,10 +33,8 @@ struct Billing {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct EventDetails {
-    customer_id: i32,
     total: Decimal,
     billing: Billing,
-    lookup_id: i32,
     transaction_id: i32,
 }
 
@@ -51,15 +49,14 @@ async fn insert_transaction(
 ) -> Result<InsertTransactionResponse, Response> {
     sqlx::query_as!(
         InsertTransactionResponse,
-        r#"INSERT INTO payments (member_id, amount_paid, method, platform, subscription_id, transaction_id)
-            SELECT id, $2, $3, 'webconnex', $4, $5
+        r#"INSERT INTO payments (member_id, amount_paid, payment_method, platform, transaction_id)
+            SELECT id, $2, $3, 'webconnex', $4
             FROM members
-            WHERE webconnex_id = $1
+            WHERE email = $1
         RETURNING id, member_id"#,
-        body.customer_id,
+        body.billing.email,
         body.total,
         body.billing.payment_method,
-        body.lookup_id,
         body.transaction_id
     )
     .fetch_one(&state.db_pool)

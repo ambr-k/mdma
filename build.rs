@@ -5,7 +5,7 @@ fn main() {
 }
 
 fn run_tailwind() {
-    let output = Command::new("npx")
+    let result = Command::new("npx")
         .args([
             "tailwindcss",
             "-i",
@@ -13,9 +13,15 @@ fn run_tailwind() {
             "-o",
             "static/styles.css",
         ])
-        .output()
-        .unwrap();
-    if !output.status.success() {
-        panic!("{}", String::from_utf8(output.stderr).unwrap());
+        .output();
+    match result {
+        Ok(output) => {
+            if !output.status.success() {
+                panic!("{}", String::from_utf8(output.stderr).unwrap());
+            }
+        }
+        Err(err) => {
+            println!("[WARN] tailwind failed: {}", err.to_string());
+        }
     }
 }

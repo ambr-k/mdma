@@ -1,1 +1,1 @@
-assets = ["static/*"]
+assets = ["static/*", ".sqlx/*"]
