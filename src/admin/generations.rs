@@ -19,12 +19,6 @@ impl GenerationStats {
     }
 }
 
-// #[derive(Template)]
-// #[template(path = "admin/generations.html")]
-// pub struct UsersListTemplate {
-//     generations: Vec<GenerationStats>,
-// }
-
 pub async fn generations_list(State(state): State<crate::AppState>) -> Markup {
     let generations = sqlx::query_as!(
         GenerationStats,

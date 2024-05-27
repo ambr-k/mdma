@@ -221,6 +221,35 @@ pub async fn user_details(
 }
 
 #[derive(Template)]
+#[template(path = "admin/user_add_payment.html")]
+pub struct NewPaymentFormTemplate {
+    user: User,
+}
+
+pub async fn user_payment_form(
+    Path(user_id): Path<i32>,
+    State(state): State<crate::AppState>,
+) -> Result<NewPaymentFormTemplate, Response> {
+    let user = sqlx::query_as!(
+        User,
+        r#" SELECT members.*, generations.title AS generation_name
+            FROM members
+                INNER JOIN member_generations ON members.id = member_id
+                INNER JOIN generations ON generations.id = generation_id
+            WHERE members.id=$1"#,
+        user_id
+    )
+    .fetch_one(&state.db_pool)
+    .await
+    .map_err(|err| match err {
+        Error::RowNotFound => (StatusCode::NOT_FOUND, err.to_string()).into_response(),
+        _ => (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()).into_response(),
+    })?;
+
+    Ok(NewPaymentFormTemplate { user })
+}
+
+#[derive(Template)]
 #[template(path = "admin/new_payment_response.html")]
 pub struct NewPaymentResponseTemplate {
     user_id: i32,

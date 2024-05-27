@@ -24,7 +24,10 @@ pub fn router(state: crate::AppState) -> Router {
         .route("/", get(root))
         .route("/users", get(users::users_list))
         .route("/user/:user_id", get(users::user_details))
-        .route("/user/:user_id/payment", post(users::add_payment))
+        .route(
+            "/user/:user_id/payment",
+            post(users::add_payment).get(users::user_payment_form),
+        )
         .route("/generations", get(generations::generations_list))
         .route("/bulk_update", get(bulk_update::bulk_update_form))
         .route(

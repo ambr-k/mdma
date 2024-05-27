@@ -14,6 +14,7 @@
 <div hx-swap-oob="innerHTML:#user_details_{{user_id}}">
     <progress class="progress htmx-indicator">
         <script>
+            $("#modal")[0].close();
             htmx.trigger("#user_details_trigger_{{user_id}}", "change", {});
         </script>
     </progress>
@@ -28,10 +29,9 @@
         <span>Payment added succesfully</span>
         <script>
             setTimeout(() => {
-                document.getElementById("alert_payment_success_{{tx_id}}").addEventListener("transitionend", () => {
-                    document.getElementById("alert_payment_success_{{tx_id}}").remove();
-                });
-                document.getElementById("alert_payment_success_{{tx_id}}").style.opacity = 0;
+                const toastElem = $("#alert_payment_success_{{tx_id}}")
+                toastElem.on("transitionend", (event) => { event.target.remove(); });
+                toastElem.css("opacity", 0);
             }, 2500);
         </script>
     </div>
