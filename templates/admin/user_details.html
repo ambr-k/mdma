@@ -7,7 +7,7 @@
 </a>
 
 {% if let Some(val) = user.consecutive_since_cached %}
-<p>Active since {{val}}</p>
+<p>Active since {{val}} ({{user.generation_name.as_deref().unwrap_or("Generation N/A")}})</p>
 {% endif %}
 
 {% if let Some(val) = user.consecutive_until_cached %}

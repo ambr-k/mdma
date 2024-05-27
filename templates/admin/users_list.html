@@ -28,6 +28,20 @@
                     </label>
                 </div>
 
+                <div class="form-control">
+                    <label class="label cursor-pointer">
+                        <span class="label-text">Generation</span>
+                        <select name="generation_id" class="select select-bordered">
+                            <option value="-1">(Any Generation)</option>
+                            {% for option in generation_options %}
+                            <option value="{{option.id}}" {% if option.id==generation_id %}selected{% endif %}>
+                                {{option.description}}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                </div>
+
                 <button class="btn btn-primary w-1/2 block mx-auto !mb-0">SEARCH</button>
             </form>
         </div>
@@ -59,7 +73,8 @@
             hx-vals='{
                 "count": {{request.count}},
                 "offset": {{request.offset}},
-                "active_only": {{active_only}}
+                "active_only": {{active_only}},
+                "generation_id": {{generation_id}}
                 {% if let Some(val) = search %}, "search": "{{val}}" {% endif %} }'>
             {{ text }}
         </button>

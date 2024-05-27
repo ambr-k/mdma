@@ -54,7 +54,7 @@ async fn insert_transaction(
             FROM members
             WHERE email = $1
         RETURNING id, member_id"#,
-        body.billing.email,
+        body.billing.email.to_lowercase(),
         body.total,
         body.billing.payment_method,
         body.transaction_id

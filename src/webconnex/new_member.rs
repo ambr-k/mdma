@@ -15,7 +15,7 @@ async fn create_user(
         r#"INSERT INTO members (email, first_name, last_name)
         VALUES ($1, $2, $3)
         RETURNING id"#,
-        event.billing.email,
+        event.billing.email.to_lowercase(),
         event.billing.name.first,
         event.billing.name.last
     )

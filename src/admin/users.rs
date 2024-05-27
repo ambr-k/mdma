@@ -21,6 +21,12 @@ struct User {
     created_on: Date,
     consecutive_since_cached: Option<Date>,
     consecutive_until_cached: Option<Date>,
+    generation_name: Option<String>,
+}
+
+struct SelectIdOption {
+    id: i32,
+    description: String,
 }
 
 pub struct PaginationRequest {
@@ -34,6 +40,8 @@ pub struct UsersListTemplate {
     users: Vec<User>,
     search: Option<String>,
     active_only: bool,
+    generation_options: Vec<SelectIdOption>,
+    generation_id: i32,
     range: (i64, i64, i64),
 
     prev: Option<PaginationRequest>,
@@ -53,6 +61,9 @@ pub struct UsersListQuery {
 
     #[serde_inline_default(0)]
     offset: i64,
+
+    #[serde_inline_default(-1)]
+    generation_id: i32,
 }
 
 pub async fn users_list(
@@ -62,20 +73,27 @@ pub async fn users_list(
     let users = sqlx::query_as!(
         User,
         r#"
-            SELECT *
+            SELECT members.*, generations.title AS generation_name
             FROM members
+                LEFT JOIN member_generations ON members.id = member_id
+                LEFT JOIN generations ON generations.id = generation_id
             WHERE (
                 $1::text IS NULL
                 OR POSITION(LOWER($1::text) IN LOWER(first_name || ' ' || last_name)) > 0
                 OR POSITION(LOWER($1::text) IN LOWER(email)) > 0
             ) AND (
-                NOT $4 OR consecutive_until_cached > NOW()
+                NOT $4
+                OR (consecutive_until_cached > NOW() AND reason_removed IS NULL)
+            ) AND (
+                $5::int < 0
+                OR generations.id = $5::int
             )
             LIMIT $2 OFFSET $3"#,
         params.search,
         params.count,
         params.offset,
-        params.active_only
+        params.active_only,
+        params.generation_id
     )
     .fetch_all(&state.db_pool)
     .await
@@ -85,25 +103,40 @@ pub async fn users_list(
         r#"
             SELECT COUNT(*)
             FROM members
+                LEFT JOIN member_generations ON members.id = member_id
             WHERE (
                 $1::text IS NULL
                 OR POSITION(LOWER($1::text) IN LOWER(first_name || ' ' || last_name)) > 0
                 OR POSITION(LOWER($1::text) IN LOWER(email)) > 0
             ) AND (
                 NOT $2 OR consecutive_until_cached > NOW()
+            ) AND (
+                $3::int < 0
+                OR generation_id = $3::int
             )
             "#,
         params.search,
-        params.active_only
+        params.active_only,
+        params.generation_id
     )
     .fetch_one(&state.db_pool)
     .await
     .unwrap()
     .unwrap_or_default();
 
+    let generation_options = sqlx::query_as!(
+        SelectIdOption,
+        r#"SELECT id, CONCAT(title, ' (', start_date, ')') AS "description!" FROM generations"#
+    )
+    .fetch_all(&state.db_pool)
+    .await
+    .unwrap();
+
     UsersListTemplate {
         search: params.search,
         active_only: params.active_only,
+        generation_id: params.generation_id,
+        generation_options,
         range: (
             params.offset + 1,
             params.offset + (users.len() as i64),
@@ -153,8 +186,11 @@ pub async fn user_details(
 ) -> Result<UserDetailsTemplate, Response> {
     let user = sqlx::query_as!(
         User,
-        r#" SELECT * FROM members
-            WHERE id=$1"#,
+        r#" SELECT members.*, generations.title AS generation_name
+            FROM members
+                INNER JOIN member_generations ON members.id = member_id
+                INNER JOIN generations ON generations.id = generation_id
+            WHERE members.id=$1"#,
         user_id
     )
     .fetch_one(&state.db_pool)
