@@ -3,8 +3,10 @@ use axum::{routing::get, Router};
 use axum_extra::extract::CookieJar;
 use shuttle_runtime::{CustomError, SecretStore};
 use tower_http::services::ServeDir;
+
 mod admin;
 mod auth;
+mod icons;
 mod webconnex;
 
 #[derive(Clone)]
