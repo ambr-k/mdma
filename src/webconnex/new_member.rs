@@ -1,28 +1,9 @@
-use super::{insert_transaction, EventDetails, RequestPayload};
-use askama_axum::IntoResponse;
-use axum::{extract::State, http::StatusCode, response::Response, Json};
+use axum::{extract::State, response::Response, Json};
 
-struct SqlCreateResponse {
-    id: i32,
-}
-
-async fn create_user(
-    event: &EventDetails,
-    state: &crate::AppState,
-) -> Result<SqlCreateResponse, Response> {
-    sqlx::query_as!(
-        SqlCreateResponse,
-        r#"INSERT INTO members (email, first_name, last_name)
-        VALUES ($1, $2, $3)
-        RETURNING id"#,
-        event.billing.email.to_lowercase(),
-        event.billing.name.first,
-        event.billing.name.last
-    )
-    .fetch_one(&state.db_pool)
-    .await
-    .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()).into_response())
-}
+use super::{
+    db_create_user::create_user, db_insert_transaction::insert_transaction,
+    request_payload::RequestPayload,
+};
 
 #[derive(serde::Serialize)]
 pub struct ResponseBody {
