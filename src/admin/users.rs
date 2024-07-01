@@ -1,3 +1,4 @@
+use crate::icons;
 use askama::Template;
 use askama_axum::IntoResponse;
 use axum::{
@@ -5,6 +6,7 @@ use axum::{
     http::StatusCode,
     response::Response,
 };
+use maud::{html, Markup, PreEscaped};
 use rust_decimal::Decimal;
 use serde::Deserialize;
 use serde_inline_default::serde_inline_default;
@@ -249,14 +251,6 @@ pub async fn user_payment_form(
     Ok(NewPaymentFormTemplate { user })
 }
 
-#[derive(Template)]
-#[template(path = "admin/new_payment_response.html")]
-pub struct NewPaymentResponseTemplate {
-    user_id: i32,
-    transaction_id: Option<i32>,
-    errors: Option<Vec<String>>,
-}
-
 #[serde_inline_default]
 #[derive(Deserialize)]
 pub struct NewPaymentFormData {
@@ -272,7 +266,7 @@ pub async fn add_payment(
     State(state): State<crate::AppState>,
     Path(user_id): Path<i32>,
     Form(form): Form<NewPaymentFormData>,
-) -> NewPaymentResponseTemplate {
+) -> Markup {
     let sql_result = sqlx::query_scalar!(
         r#"INSERT INTO payments (member_id, effective_on, duration_months, amount_paid, payment_method, platform, transaction_id, notes)
             VALUES              ($1,        $2,           $3,              $4,          $5,             'mdma',   $6,             $7)
@@ -288,15 +282,34 @@ pub async fn add_payment(
     .await;
 
     match sql_result {
-        Ok(transaction_id) => NewPaymentResponseTemplate {
-            user_id,
-            transaction_id: Some(transaction_id),
-            errors: None,
+        Ok(transaction_id) => html! {
+            div hx-swap-oob={"innerHTML:#user_details_"(user_id)} {
+                progress ."progress"."htmx-indicator" {
+                    script {(PreEscaped(format!("
+                        $('#modal')[0].close();
+                        htmx.trigger('#user_details_trigger_{}', 'change', {{}});
+                    ", user_id)))}
+                }
+            }
+            div hx-swap-oob="beforeend:#alerts" {
+                #{"alert_payment_success_"(transaction_id)}."alert"."alert-success"."transition-opacity"."duraiton-300" role="alert" {
+                    (icons::success())
+                    span {"Payment Added Successfully"}
+                    script {(PreEscaped(format!("
+                        setTimeout(() => {{
+                            const toastElem = $('#alert_payment_success_{}');
+                            toastElem.on('transitionend', (event) => {{event.target.remove();}});
+                            toastElem.css('opacity', 0);
+                        }}, 2500);
+                    ", transaction_id)))}
+                }
+            }
         },
-        Err(err) => NewPaymentResponseTemplate {
-            user_id,
-            transaction_id: None,
-            errors: Some(vec![err.to_string()]),
+        Err(err) => html! {
+            ."alert"."alert-error" role="alert" {
+                (icons::error())
+                span {(err.to_string())}
+            }
         },
     }
 }

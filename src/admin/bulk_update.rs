@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use askama::Template;
+use crate::icons;
 use askama_axum::IntoResponse;
 use axum::{
     extract::{Multipart, State},
@@ -8,14 +8,32 @@ use axum::{
     response::Response,
     Extension,
 };
+use maud::{html, Markup};
 use rust_decimal::Decimal;
 
-#[derive(Template)]
-#[template(path = "admin/bulk_update.html")]
-pub struct BulkUpdateTemplate {}
-
-pub async fn bulk_update_form() -> BulkUpdateTemplate {
-    BulkUpdateTemplate {}
+pub async fn bulk_update_form() -> Markup {
+    html! {
+        ."alert"."alert-warning"."w-full"."max-w-xl"."mx-auto" role="warning" {
+            (icons::warning())
+            span {"Warning: Here be dragons! 🐉 Seriously, make sure you know what you're doing on this page..."}
+        }
+        ."collapse"."collapse-arrow"."bg-base-200"."w-full"."max-w-xl"."mx-auto"."mt-4"."outline"."outline-1" {
+            input type="checkbox";
+            ."collapse-title"."text-xl"."font-medium" {"GivingFuel Donations Import"}
+            ."collapse-content" {
+                a href="https://manage.webconnex.com/reports/donations" target="_blank" ."btn"."btn-neutral" {"Open Donations Page"}
+                p {"Click \"Export\" in the top right of the donations page to download all donation records"}
+                form #"givingfuel-bulk-import-form"."mt-8" hx-encoding="multipart/form-data" hx-post="admin/.givingfuel_bulk_import" {
+                    input type="file" name="file" ."file-input"."file-input-bordered"."file-input-primary"."w-full";
+                    label ."form-control"."w-full" {
+                        ."label" { span ."label-text" {"Enter your email to prove you know what you're doing..."} }
+                        input type="text" name="email-verify" placeholder="Email" ."input"."input-bordered";
+                        button ."btn"."btn-secondary"."w-1/3"."mx-auto"."mt-4" {"UPLOAD"}
+                    }
+                }
+            }
+        }
+    }
 }
 
 time::serde::format_description!(
