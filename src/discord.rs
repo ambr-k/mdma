@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use askama_axum::IntoResponse;
 use axum::{
     body::Bytes,
@@ -12,6 +14,7 @@ use serenity::{builder::*, model::prelude::*};
 async fn register_user(
     email: &str,
     user_id: UserId,
+    assign_role: Option<RoleId>,
     state: crate::AppState,
 ) -> CreateInteractionResponse {
     match sqlx::query!(
@@ -25,6 +28,12 @@ async fn register_user(
         Ok(result) => CreateInteractionResponse::Message(
             CreateInteractionResponseMessage::new()
                 .content(if result.rows_affected() == 1 {
+                    if let Some(role_id) = assign_role {
+                        let _ = state
+                            .discord_http
+                            .add_member_role(state.discord_guild, user_id, role_id, None)
+                            .await;
+                    }
                     String::from("Thank you for joining!")
                 } else {
                     format!(
@@ -45,17 +54,16 @@ async fn register_user(
 fn handle_component_interaction(
     event: ComponentInteraction,
 ) -> Result<CreateInteractionResponse, StatusCode> {
-    match event.data.custom_id.as_str() {
-        "mdma_open_register_model" => Ok(CreateInteractionResponse::Modal(
-            CreateModal::new("mdma_register_modal", "Accept & Join").components(vec![
-                CreateActionRow::InputText(
+    match event.data.custom_id.split_once(":") {
+        Some(("mdma_open_register_modal", role_id)) => Ok(CreateInteractionResponse::Modal(
+            CreateModal::new(format!("mdma_register_modal:{}", role_id), "Accept & Join")
+                .components(vec![CreateActionRow::InputText(
                     CreateInputText::new(InputTextStyle::Short, "EMAIL", "mdma_register_email")
                         .placeholder("jon.doe@example.com")
                         .required(true),
-                ),
-            ]),
+                )]),
         )),
-        &_ => Err(StatusCode::NOT_FOUND),
+        _ => Err(StatusCode::NOT_FOUND),
     }
 }
 
@@ -63,28 +71,43 @@ async fn handle_modal_interaction(
     event: ModalInteraction,
     state: crate::AppState,
 ) -> Result<CreateInteractionResponse, StatusCode> {
-    match event.data.custom_id.as_str() {
-        "mdma_register_modal" => match &event.data.components[0].components[0] {
+    match event.data.custom_id.split_once(":") {
+        Some(("mdma_register_modal", role_id)) => match &event.data.components[0].components[0] {
             ActionRowComponent::InputText(textbox) => Ok(register_user(
                 textbox.value.as_ref().ok_or(StatusCode::BAD_REQUEST)?,
                 event.user.id,
+                RoleId::from_str(role_id).ok(),
                 state,
             )
             .await),
             &_ => Err(StatusCode::BAD_REQUEST),
         },
-        &_ => Err(StatusCode::NOT_FOUND),
+        _ => Err(StatusCode::NOT_FOUND),
     }
 }
 
 fn handle_slash_command(
     event: CommandInteraction,
 ) -> Result<CreateInteractionResponse, StatusCode> {
+    let options: std::collections::HashMap<String, CommandDataOptionValue> = event
+        .data
+        .options
+        .iter()
+        .map(|o| (o.name.clone(), o.value.clone()))
+        .collect();
+
+    let role_id = match options.get("assign_role") {
+        None => String::from("_"),
+        Some(CommandDataOptionValue::Role(role)) => role.get().to_string(),
+        Some(_) => return Err(StatusCode::BAD_REQUEST),
+    };
+
     match event.data.name.as_str() {
         "register_users" => Ok(CreateInteractionResponse::Message(
-            CreateInteractionResponseMessage::new()
-                .content("")
-                .button(CreateButton::new("mdma_open_register_model").label("Accept & Join")),
+            CreateInteractionResponseMessage::new().button(
+                CreateButton::new(format!("mdma_open_register_modal:{}", role_id))
+                    .label("Accept & Join"),
+            ),
         )),
         &_ => Err(StatusCode::NOT_FOUND),
     }
@@ -141,6 +164,11 @@ pub async fn create_commands(
     CreateCommand::new("register_users")
         .description("Create a button to register Discord users in MDMA")
         .default_member_permissions(Permissions::ADMINISTRATOR)
+        .add_option(CreateCommandOption::new(
+            CommandOptionType::Role,
+            "assign_role",
+            "Assign a role to members after successfully registering",
+        ))
         .execute(&discord_http, (Some(*discord_guild), None))
         .await
         .unwrap();
