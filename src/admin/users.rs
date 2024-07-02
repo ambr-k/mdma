@@ -175,6 +175,7 @@ pub struct UserDetailsTemplate {
     user: User,
     webconnex: WebconnexCustomerSearchResponse,
     discord: Option<DiscordMembership>,
+    discord_role: Option<serenity::model::guild::Role>,
 }
 
 #[derive(Deserialize)]
@@ -244,10 +245,29 @@ pub async fn user_details(
         }
     };
 
+    let discord_role = match &discord {
+        Some(DiscordMembership::GuildMember(member)) => {
+            match state
+                .discord_http
+                .get_guild_roles(state.discord_guild)
+                .await
+            {
+                Err(_) => None,
+                Ok(roles) => roles
+                    .iter()
+                    .filter(|r| member.roles.contains(&r.id))
+                    .max_by_key(|r| r.position)
+                    .map(ToOwned::to_owned),
+            }
+        }
+        _ => None,
+    };
+
     Ok(UserDetailsTemplate {
         user,
         webconnex,
         discord,
+        discord_role,
     })
 }
 
