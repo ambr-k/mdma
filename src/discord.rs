@@ -131,17 +131,17 @@ pub async fn handle_request(
         .into_response())
 }
 
-pub async fn create_commands(http: &serenity::http::Http) {
+pub async fn create_commands(
+    crate::AppState {
+        discord_http,
+        discord_guild,
+        ..
+    }: &crate::AppState,
+) {
     CreateCommand::new("register_users")
         .description("Create a button to register Discord users in MDMA")
         .default_member_permissions(Permissions::ADMINISTRATOR)
-        .execute(
-            &http,
-            (
-                Some(serenity::model::id::GuildId::new(939031914210295848)),
-                None,
-            ),
-        )
+        .execute(&discord_http, (Some(*discord_guild), None))
         .await
         .unwrap();
 }

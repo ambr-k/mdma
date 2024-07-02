@@ -7,7 +7,7 @@ use axum::{
     response::Response,
 };
 use maud::{html, Markup, PreEscaped};
-use rust_decimal::Decimal;
+use rust_decimal::{prelude::ToPrimitive, Decimal};
 use serde::Deserialize;
 use serde_inline_default::serde_inline_default;
 use sqlx::Error;
@@ -164,11 +164,17 @@ pub async fn users_list(
     }
 }
 
+pub enum DiscordMembership {
+    GuildMember(serenity::model::guild::Member),
+    GlobalUser(serenity::model::user::User),
+}
+
 #[derive(Template)]
 #[template(path = "admin/user_details.html")]
 pub struct UserDetailsTemplate {
     user: User,
     webconnex: WebconnexCustomerSearchResponse,
+    discord: Option<DiscordMembership>,
 }
 
 #[derive(Deserialize)]
@@ -220,7 +226,29 @@ pub async fn user_details(
         .await
         .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()).into_response())?;
 
-    Ok(UserDetailsTemplate { user, webconnex })
+    let discord = match user.discord.and_then(|uid| uid.to_u64()) {
+        None => None,
+        Some(uid) => {
+            let user_id = serenity::model::id::UserId::new(uid);
+            match state
+                .discord_http
+                .get_member(state.discord_guild, user_id)
+                .await
+            {
+                Ok(member) => Some(DiscordMembership::GuildMember(member)),
+                Err(_) => match state.discord_http.get_user(user_id).await {
+                    Ok(user) => Some(DiscordMembership::GlobalUser(user)),
+                    Err(_) => None,
+                },
+            }
+        }
+    };
+
+    Ok(UserDetailsTemplate {
+        user,
+        webconnex,
+        discord,
+    })
 }
 
 #[derive(Template)]

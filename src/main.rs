@@ -23,6 +23,7 @@ struct AppState {
     http_client: reqwest::Client,
     discord_verifier: serenity::interactions_endpoint::Verifier,
     discord_http: Arc<serenity::http::Http>,
+    discord_guild: serenity::model::id::GuildId,
 }
 
 async fn home(cookies: CookieJar) -> Markup {
@@ -91,22 +92,24 @@ async fn main(
     );
 
     let discord_verifier = serenity::interactions_endpoint::Verifier::new(
-        secret_store.get("DISCORD_API_KEY").unwrap().as_str(),
+        &secret_store.get("DISCORD_API_KEY").unwrap(),
     );
 
     let http_client = reqwest::Client::new();
 
     let discord_http = Arc::new(serenity::http::Http::new(
-        secret_store.get("DISCORD_BOT_TOKEN").unwrap().as_str(),
+        &secret_store.get("DISCORD_BOT_TOKEN").unwrap(),
     ));
     discord_http.set_application_id(
         serenity::model::id::ApplicationId::from_str(
-            secret_store.get("DISCORD_APPLICATION_ID").unwrap().as_str(),
+            &secret_store.get("DISCORD_APPLICATION_ID").unwrap(),
         )
         .unwrap(),
     );
 
-    discord::create_commands(&discord_http).await;
+    let discord_guild =
+        serenity::model::id::GuildId::from_str(&secret_store.get("DISCORD_GUILD_ID").unwrap())
+            .unwrap();
 
     let state = AppState {
         db_pool,
@@ -115,7 +118,10 @@ async fn main(
         http_client,
         discord_verifier,
         discord_http,
+        discord_guild,
     };
+
+    discord::create_commands(&state).await;
 
     let router = Router::new()
         .route("/", get(home))
