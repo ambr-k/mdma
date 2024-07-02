@@ -10,6 +10,81 @@ use axum::{
 use reqwest::header;
 use rust_decimal::Decimal;
 use serenity::{builder::*, model::prelude::*};
+use time::{macros::date, Date};
+
+#[allow(dead_code)]
+struct DbMember {
+    id: i32,
+    email: String,
+    first_name: String,
+    last_name: String,
+    reason_removed: Option<String>,
+    created_on: Date,
+    consecutive_since_cached: Option<Date>,
+    consecutive_until_cached: Option<Date>,
+    discord: Option<Decimal>,
+}
+
+async fn whois(
+    user_id: UserId,
+    db_pool: &sqlx::PgPool,
+) -> Result<CreateInteractionResponse, StatusCode> {
+    let result = sqlx::query_as!(
+        DbMember,
+        "SELECT * FROM members WHERE discord=$1",
+        Decimal::from(user_id.get())
+    )
+    .fetch_all(db_pool)
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    if result.is_empty() {
+        Ok(CreateInteractionResponse::Message(
+            CreateInteractionResponseMessage::new()
+                .flags(InteractionResponseFlags::SUPPRESS_NOTIFICATIONS)
+                .ephemeral(true)
+                .content(format!("<@{}> is not registered in MDMA", user_id.get())),
+        ))
+    } else {
+        Ok(CreateInteractionResponse::Message(
+            CreateInteractionResponseMessage::new()
+                .flags(InteractionResponseFlags::SUPPRESS_NOTIFICATIONS)
+                .ephemeral(true)
+                .content(format!("<@{}> is registered in MDMA", user_id.get()))
+                .add_embeds(
+                    result
+                        .iter()
+                        .map(|member| {
+                            CreateEmbed::new()
+                                .title(format!("{}, {}", member.last_name, member.first_name))
+                                .field("email", member.email.clone(), false)
+                                .field("created_on", format!("{}", member.created_on), false)
+                                .field(
+                                    "consecutive_since",
+                                    format!(
+                                        "{}",
+                                        member
+                                            .consecutive_since_cached
+                                            .unwrap_or(date!(1970 - 01 - 01))
+                                    ),
+                                    true,
+                                )
+                                .field(
+                                    "consecutive_until",
+                                    format!(
+                                        "{}",
+                                        member
+                                            .consecutive_until_cached
+                                            .unwrap_or(date!(1970 - 01 - 01))
+                                    ),
+                                    true,
+                                )
+                        })
+                        .collect(),
+                ),
+        ))
+    }
+}
 
 async fn register_user(
     email: &str,
@@ -86,8 +161,9 @@ async fn handle_modal_interaction(
     }
 }
 
-fn handle_slash_command(
+async fn handle_slash_command(
     event: CommandInteraction,
+    state: crate::AppState,
 ) -> Result<CreateInteractionResponse, StatusCode> {
     let options: std::collections::HashMap<String, CommandDataOptionValue> = event
         .data
@@ -96,19 +172,43 @@ fn handle_slash_command(
         .map(|o| (o.name.clone(), o.value.clone()))
         .collect();
 
-    let role_id = match options.get("assign_role") {
-        None => String::from("_"),
-        Some(CommandDataOptionValue::Role(role)) => role.get().to_string(),
-        Some(_) => return Err(StatusCode::BAD_REQUEST),
-    };
-
     match event.data.name.as_str() {
         "register_users" => Ok(CreateInteractionResponse::Message(
             CreateInteractionResponseMessage::new().button(
-                CreateButton::new(format!("mdma_open_register_modal:{}", role_id))
-                    .label("Accept & Join"),
+                CreateButton::new(format!(
+                    "mdma_open_register_modal:{}",
+                    match options.get("assign_role") {
+                        None => String::from("_"),
+                        Some(CommandDataOptionValue::Role(role)) => role.get().to_string(),
+                        Some(_) => return Err(StatusCode::BAD_REQUEST),
+                    }
+                ))
+                .label("Accept & Join"),
             ),
         )),
+
+        "whois" => {
+            whois(
+                match options.get("user") {
+                    Some(CommandDataOptionValue::User(user)) => *user,
+                    _ => return Err(StatusCode::BAD_REQUEST),
+                },
+                &state.db_pool,
+            )
+            .await
+        }
+
+        "MDMA WhoIs User" => {
+            whois(
+                match event.data.target_id {
+                    Some(tid) => tid.to_user_id(),
+                    None => return Err(StatusCode::BAD_REQUEST),
+                },
+                &state.db_pool,
+            )
+            .await
+        }
+
         &_ => Err(StatusCode::NOT_FOUND),
     }
 }
@@ -142,7 +242,7 @@ pub async fn handle_request(
         Interaction::Ping(_) => CreateInteractionResponse::Pong,
         Interaction::Component(event) => handle_component_interaction(event)?,
         Interaction::Modal(event) => handle_modal_interaction(event, state).await?,
-        Interaction::Command(event) => handle_slash_command(event)?,
+        Interaction::Command(event) => handle_slash_command(event, state).await?,
         _ => return Err(StatusCode::NOT_IMPLEMENTED),
     };
 
@@ -171,5 +271,23 @@ pub async fn create_commands(
         ))
         .execute(&discord_http, (Some(*discord_guild), None))
         .await
-        .unwrap();
+        .expect("/register_users");
+
+    CreateCommand::new("whois")
+        .description("Lookup a Discord user in MDMA")
+        .default_member_permissions(Permissions::ADMINISTRATOR)
+        .add_option(
+            CreateCommandOption::new(CommandOptionType::User, "user", "The user to look up")
+                .required(true),
+        )
+        .execute(&discord_http, (Some(*discord_guild), None))
+        .await
+        .expect("/whois");
+
+    CreateCommand::new("MDMA WhoIs User")
+        .kind(CommandType::User)
+        .default_member_permissions(Permissions::ADMINISTRATOR)
+        .execute(&discord_http, (Some(*discord_guild), None))
+        .await
+        .expect("user:whois");
 }
