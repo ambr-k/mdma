@@ -195,7 +195,8 @@ async fn handle_slash_command(
                         Some(_) => return Err(StatusCode::BAD_REQUEST),
                     }
                 ))
-                .label("Accept & Join"),
+                .label("Accept & Join")
+                .style(ButtonStyle::Success),
             ),
         )),
 
