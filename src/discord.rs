@@ -86,36 +86,48 @@ async fn whois(
     }
 }
 
+struct RegisterUserResponse {
+    first_name: String,
+    last_name: String,
+}
+
 async fn register_user(
     email: &str,
     user_id: UserId,
     assign_role: Option<RoleId>,
     state: crate::AppState,
 ) -> CreateInteractionResponse {
-    match sqlx::query!(
-        "UPDATE members SET discord=$1 WHERE email=LOWER($2)",
+    match sqlx::query_as!(
+        RegisterUserResponse,
+        "UPDATE members SET discord=$1 WHERE email=LOWER($2) RETURNING first_name, last_name",
         Decimal::from(user_id.get()),
         email
     )
-    .execute(&state.db_pool)
+    .fetch_optional(&state.db_pool)
     .await
     {
-        Ok(result) => CreateInteractionResponse::Message(
+        Ok(Some(result)) => {
+            if let Some(role_id) = assign_role {
+                let _ = state
+                    .discord_http
+                    .add_member_role(state.discord_guild, user_id, role_id, None)
+                    .await;
+            }
+            CreateInteractionResponse::Message(
+                CreateInteractionResponseMessage::new()
+                    .content(format!(
+                        "Welcome, {} {}! Thank you for joining.",
+                        result.first_name, result.last_name
+                    ))
+                    .ephemeral(true),
+            )
+        }
+        Ok(None) => CreateInteractionResponse::Message(
             CreateInteractionResponseMessage::new()
-                .content(if result.rows_affected() == 1 {
-                    if let Some(role_id) = assign_role {
-                        let _ = state
-                            .discord_http
-                            .add_member_role(state.discord_guild, user_id, role_id, None)
-                            .await;
-                    }
-                    String::from("Thank you for joining!")
-                } else {
-                    format!(
-                        "Could not find a member with the email {}. Please try again.",
-                        email
-                    )
-                })
+                .content(format!(
+                    "Could not find a member with the email {}. Please try again.",
+                    email
+                ))
                 .ephemeral(true),
         ),
         Err(_) => CreateInteractionResponse::Message(
