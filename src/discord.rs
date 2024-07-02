@@ -18,7 +18,7 @@ async fn register_user(
     state: crate::AppState,
 ) -> CreateInteractionResponse {
     match sqlx::query!(
-        "UPDATE members SET discord=$1 WHERE email=$2",
+        "UPDATE members SET discord=$1 WHERE email=LOWER($2)",
         Decimal::from(user_id.get()),
         email
     )
