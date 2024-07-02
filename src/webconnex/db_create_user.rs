@@ -1,6 +1,5 @@
 use askama_axum::IntoResponse;
-use axum::response::Response;
-use reqwest::StatusCode;
+use axum::{http::StatusCode, response::Response};
 
 use super::request_payload;
 

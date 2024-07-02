@@ -1,4 +1,9 @@
-use axum::{routing::get, Router};
+use std::{str::FromStr, sync::Arc};
+
+use axum::{
+    routing::{get, post},
+    Router,
+};
 use axum_extra::extract::CookieJar;
 use maud::{html, Markup, PreEscaped, DOCTYPE};
 use shuttle_runtime::{CustomError, SecretStore};
@@ -6,6 +11,7 @@ use tower_http::services::ServeDir;
 
 mod admin;
 mod auth;
+mod discord;
 mod icons;
 mod webconnex;
 
@@ -15,6 +21,8 @@ struct AppState {
     secret_store: SecretStore,
     google_oauth: oauth2::basic::BasicClient,
     http_client: reqwest::Client,
+    discord_verifier: serenity::interactions_endpoint::Verifier,
+    discord_http: Arc<serenity::http::Http>,
 }
 
 async fn home(cookies: CookieJar) -> Markup {
@@ -82,11 +90,31 @@ async fn main(
         secret_store.get("GOOGLE_OAUTH_REDIRECT").unwrap(),
     );
 
+    let discord_verifier = serenity::interactions_endpoint::Verifier::new(
+        secret_store.get("DISCORD_API_KEY").unwrap().as_str(),
+    );
+
+    let http_client = reqwest::Client::new();
+
+    let discord_http = Arc::new(serenity::http::Http::new(
+        secret_store.get("DISCORD_BOT_TOKEN").unwrap().as_str(),
+    ));
+    discord_http.set_application_id(
+        serenity::model::id::ApplicationId::from_str(
+            secret_store.get("DISCORD_APPLICATION_ID").unwrap().as_str(),
+        )
+        .unwrap(),
+    );
+
+    discord::create_commands(&discord_http).await;
+
     let state = AppState {
         db_pool,
         secret_store,
         google_oauth,
-        http_client: reqwest::Client::new(),
+        http_client,
+        discord_verifier,
+        discord_http,
     };
 
     let router = Router::new()
@@ -94,6 +122,7 @@ async fn main(
         .route("/signin", get(auth::signin_redirect))
         .route("/signout", get(auth::signout))
         .route("/callback-google", get(auth::oauth_callback))
+        .route("/.discord/interaction", post(discord::handle_request))
         .with_state(state.clone())
         .nest("/admin", admin::router(state.clone()))
         .nest("/.webconnex", webconnex::router(state.clone()))

@@ -24,6 +24,7 @@ struct User {
     consecutive_since_cached: Option<Date>,
     consecutive_until_cached: Option<Date>,
     generation_name: Option<String>,
+    discord: Option<Decimal>,
 }
 
 struct SelectIdOption {
