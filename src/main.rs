@@ -11,6 +11,7 @@ use tower_http::services::ServeDir;
 
 mod admin;
 mod auth;
+mod db;
 mod discord;
 mod icons;
 mod webconnex;

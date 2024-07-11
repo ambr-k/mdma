@@ -34,11 +34,33 @@
                         <select name="generation_id" class="select select-bordered">
                             <option value="-1">(Any Generation)</option>
                             {% for option in generation_options %}
-                            <option value="{{option.id}}" {% if option.id==generation_id %}selected{% endif %}>
+                            <option value="{{option.id}}" {% if option.id==generation_id %}selected{%endif%}>
                                 {{option.description}}
                             </option>
                             {% endfor %}
                         </select>
+                    </label>
+                </div>
+
+                <div class="divider">Sort Results</div>
+
+                <div class="form-control">
+                    <label class="label cursor-pointer">
+                        <span class="label-text">Sort By</span>
+                        <select name="sort_by" class="select select-bordered">
+                            <option value="0" {% if sort_by==0 %}selected{%endif%}>(Default)</option>
+                            <option value="1" {% if sort_by==1 %}selected{%endif%}>First Name</option>
+                            <option value="2" {% if sort_by==2 %}selected{%endif%}>Last Name</option>
+                            <option value="3" {% if sort_by==3 %}selected{%endif%}>Active Since</option>
+                        </select>
+                    </label>
+                </div>
+
+                <div class="form-control">
+                    <label class="label cursor-pointer">
+                        <span class="label-text">Descending</span>
+                        <input type="checkbox" name="sort_desc" value="true" {% if sort_desc %}checked{%endif%}
+                            class="checkbox checkbox-primary" />
                     </label>
                 </div>
 
@@ -50,7 +72,7 @@
     <div class="divider"></div>
 
     <!-- USER ROW -->
-    {% for user in users %}
+    {% for user in members %}
     <div class="collapse collapse-arrow bg-base-200 my-2">
         <input type="radio" name="users-list-accordion" hx-get="admin/user/{{user.id}}" hx-indicator="closest .collapse"
             hx-target="next .collapse-content" hx-swap="innerHTML" id="user_details_trigger_{{user.id}}" />
@@ -74,7 +96,9 @@
                 "count": {{request.count}},
                 "offset": {{request.offset}},
                 "active_only": {{active_only}},
-                "generation_id": {{generation_id}}
+                "generation_id": {{generation_id}},
+                "sort_by": {{sort_by}},
+                "sort_desc": {{sort_desc}}
                 {% if let Some(val) = search %}, "search": "{{val}}" {% endif %} }'>
             {{ text }}
         </button>

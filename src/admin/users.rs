@@ -1,4 +1,7 @@
-use crate::icons;
+use crate::{
+    db::members::{MemberRow, MembersQuery},
+    icons,
+};
 use askama::Template;
 use askama_axum::IntoResponse;
 use axum::{
@@ -12,20 +15,7 @@ use serde::Deserialize;
 use serde_inline_default::serde_inline_default;
 use sqlx::Error;
 use time::Date;
-
-#[allow(dead_code)]
-struct User {
-    id: i32,
-    email: String,
-    first_name: String,
-    last_name: String,
-    reason_removed: Option<String>,
-    created_on: Date,
-    consecutive_since_cached: Option<Date>,
-    consecutive_until_cached: Option<Date>,
-    generation_name: Option<String>,
-    discord: Option<Decimal>,
-}
+use tokio::try_join;
 
 struct SelectIdOption {
     id: i32,
@@ -33,99 +23,35 @@ struct SelectIdOption {
 }
 
 pub struct PaginationRequest {
-    count: i64,
-    offset: i64,
+    count: u64,
+    offset: u64,
 }
 
 #[derive(Template)]
 #[template(path = "admin/users_list.html")]
 pub struct UsersListTemplate {
-    users: Vec<User>,
+    members: Vec<MemberRow>,
     search: Option<String>,
     active_only: bool,
     generation_options: Vec<SelectIdOption>,
     generation_id: i32,
-    range: (i64, i64, i64),
+    range: (u64, u64, u64),
+    sort_by: u64,
+    sort_desc: bool,
 
     prev: Option<PaginationRequest>,
     next: Option<PaginationRequest>,
 }
 
-#[serde_inline_default]
-#[derive(Deserialize)]
-pub struct UsersListQuery {
-    search: Option<String>,
-
-    #[serde_inline_default(false)]
-    active_only: bool,
-
-    #[serde_inline_default(12)]
-    count: i64,
-
-    #[serde_inline_default(0)]
-    offset: i64,
-
-    #[serde_inline_default(-1)]
-    generation_id: i32,
-}
-
 pub async fn users_list(
-    Query(params): Query<UsersListQuery>,
+    Query(params): Query<MembersQuery>,
     State(state): State<crate::AppState>,
-) -> UsersListTemplate {
-    let users = sqlx::query_as!(
-        User,
-        r#"
-            SELECT members.*, generations.title AS generation_name
-            FROM members
-                LEFT JOIN member_generations ON members.id = member_id
-                LEFT JOIN generations ON generations.id = generation_id
-            WHERE (
-                $1::text IS NULL
-                OR POSITION(LOWER($1::text) IN LOWER(first_name || ' ' || last_name)) > 0
-                OR POSITION(LOWER($1::text) IN LOWER(email)) > 0
-            ) AND (
-                NOT $4
-                OR (consecutive_until_cached > NOW() AND reason_removed IS NULL)
-            ) AND (
-                $5::int < 0
-                OR generations.id = $5::int
-            )
-            LIMIT $2 OFFSET $3"#,
-        params.search,
-        params.count,
-        params.offset,
-        params.active_only,
-        params.generation_id
+) -> Result<UsersListTemplate, Response> {
+    let (members, total) = try_join!(
+        crate::db::members::search(&params, &state.db_pool),
+        crate::db::members::count(&params, &state.db_pool)
     )
-    .fetch_all(&state.db_pool)
-    .await
-    .unwrap();
-
-    let total = sqlx::query_scalar!(
-        r#"
-            SELECT COUNT(*)
-            FROM members
-                LEFT JOIN member_generations ON members.id = member_id
-            WHERE (
-                $1::text IS NULL
-                OR POSITION(LOWER($1::text) IN LOWER(first_name || ' ' || last_name)) > 0
-                OR POSITION(LOWER($1::text) IN LOWER(email)) > 0
-            ) AND (
-                NOT $2 OR consecutive_until_cached > NOW()
-            ) AND (
-                $3::int < 0
-                OR generation_id = $3::int
-            )
-            "#,
-        params.search,
-        params.active_only,
-        params.generation_id
-    )
-    .fetch_one(&state.db_pool)
-    .await
-    .unwrap()
-    .unwrap_or_default();
+    .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()).into_response())?;
 
     let generation_options = sqlx::query_as!(
         SelectIdOption,
@@ -135,17 +61,17 @@ pub async fn users_list(
     .await
     .unwrap();
 
-    UsersListTemplate {
+    Ok(UsersListTemplate {
         search: params.search,
         active_only: params.active_only,
         generation_id: params.generation_id,
         generation_options,
         range: (
             params.offset + 1,
-            params.offset + (users.len() as i64),
+            params.offset + (members.len() as u64),
             total,
         ),
-        users,
+        members,
         prev: match params.offset {
             0 => None,
             _ => Some(PaginationRequest {
@@ -161,7 +87,9 @@ pub async fn users_list(
                 offset: params.offset + params.count,
             })
         },
-    }
+        sort_by: params.sort_by,
+        sort_desc: params.sort_desc,
+    })
 }
 
 pub enum DiscordMembership {
@@ -172,7 +100,7 @@ pub enum DiscordMembership {
 #[derive(Template)]
 #[template(path = "admin/user_details.html")]
 pub struct UserDetailsTemplate {
-    user: User,
+    user: MemberRow,
     webconnex: WebconnexCustomerSearchResponse,
     discord: Option<DiscordMembership>,
     discord_role: Option<serenity::model::guild::Role>,
@@ -195,7 +123,7 @@ pub async fn user_details(
     State(state): State<crate::AppState>,
 ) -> Result<UserDetailsTemplate, Response> {
     let user = sqlx::query_as!(
-        User,
+        MemberRow,
         r#" SELECT members.*, generations.title AS generation_name
             FROM members
                 INNER JOIN member_generations ON members.id = member_id
@@ -274,7 +202,7 @@ pub async fn user_details(
 #[derive(Template)]
 #[template(path = "admin/user_add_payment.html")]
 pub struct NewPaymentFormTemplate {
-    user: User,
+    user: MemberRow,
 }
 
 pub async fn user_payment_form(
@@ -282,7 +210,7 @@ pub async fn user_payment_form(
     State(state): State<crate::AppState>,
 ) -> Result<NewPaymentFormTemplate, Response> {
     let user = sqlx::query_as!(
-        User,
+        MemberRow,
         r#" SELECT members.*, generations.title AS generation_name
             FROM members
                 INNER JOIN member_generations ON members.id = member_id
