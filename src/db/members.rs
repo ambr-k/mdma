@@ -6,13 +6,14 @@ use sea_query::{
 use sea_query_binder::SqlxBinder;
 use serde::Deserialize;
 use serde_inline_default::serde_inline_default;
-use sqlx::{prelude::FromRow, PgPool};
+use sqlx::prelude::FromRow;
 use time::Date;
 
 #[serde_inline_default]
 #[derive(Deserialize)]
 pub struct MembersQuery {
     pub search: Option<String>,
+    pub discord: Option<String>,
 
     #[serde_inline_default(false)]
     pub active_only: bool,
@@ -50,12 +51,22 @@ pub struct MemberRow {
 
 trait MembersQueryFilter {
     fn members_query_filter(&mut self, params: &MembersQuery) -> &mut Self;
+    async fn members_discord_filter(
+        &mut self,
+        discord: &Option<String>,
+        http: &serenity::http::Http,
+        guildid: &serenity::model::id::GuildId,
+    ) -> &mut Self;
 }
 
 impl MembersQueryFilter for sea_query::SelectStatement {
     fn members_query_filter(&mut self, params: &MembersQuery) -> &mut Self {
         self.conditions(
-            params.search.is_some(),
+            !params
+                .search
+                .as_ref()
+                .unwrap_or(&String::from(""))
+                .is_empty(),
             |q| {
                 q.and_where(
                     Expr::col(Members::FirstName)
@@ -90,11 +101,40 @@ impl MembersQueryFilter for sea_query::SelectStatement {
             |_| {},
         )
     }
+
+    async fn members_discord_filter(
+        &mut self,
+        discord: &Option<String>,
+        http: &serenity::http::Http,
+        guildid: &serenity::model::id::GuildId,
+    ) -> &mut Self {
+        let userids = match discord.as_deref() {
+            Some("") => None,
+            Some(val) => http
+                .search_guild_members(*guildid, val, Some(1000))
+                .await
+                .ok(),
+            None => None,
+        }
+        .map(|v| {
+            v.iter()
+                .map(|m| Decimal::from(m.user.id.get()))
+                .collect::<Vec<_>>()
+        });
+
+        self.conditions(
+            userids.is_some(),
+            |q| {
+                q.and_where(Expr::col(Members::Discord).is_in(userids.unwrap()));
+            },
+            |_| {},
+        )
+    }
 }
 
 pub async fn search(
     params: &MembersQuery,
-    db_pool: &PgPool,
+    state: &crate::AppState,
 ) -> Result<Vec<MemberRow>, sqlx::Error> {
     let sort_order = if params.sort_desc {
         Order::Desc
@@ -133,14 +173,16 @@ pub async fn search(
             )],
             _ => vec![((Members::Table, Members::Id), sort_order.clone())],
         })
+        .members_discord_filter(&params.discord, &state.discord_http, &state.discord_guild)
+        .await
         .build_sqlx(PostgresQueryBuilder);
 
     sqlx::query_as_with::<_, MemberRow, _>(&query, values)
-        .fetch_all(db_pool)
+        .fetch_all(&state.db_pool)
         .await
 }
 
-pub async fn count(params: &MembersQuery, db_pool: &PgPool) -> Result<u64, sqlx::Error> {
+pub async fn count(params: &MembersQuery, state: &crate::AppState) -> Result<u64, sqlx::Error> {
     let (query, values) = Query::select()
         .expr(Expr::col(Asterisk).count())
         .from(Members::Table)
@@ -149,10 +191,12 @@ pub async fn count(params: &MembersQuery, db_pool: &PgPool) -> Result<u64, sqlx:
             Expr::col((Members::Table, Members::Id)).equals(MemberGenerations::MemberId),
         )
         .members_query_filter(params)
+        .members_discord_filter(&params.discord, &state.discord_http, &state.discord_guild)
+        .await
         .build_sqlx(PostgresQueryBuilder);
 
     sqlx::query_scalar_with::<_, i64, _>(&query, values)
-        .fetch_one(db_pool)
+        .fetch_one(&state.db_pool)
         .await
         .and_then(|r| Ok(r.try_into().unwrap()))
 }

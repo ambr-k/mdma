@@ -32,6 +32,7 @@ pub struct PaginationRequest {
 pub struct UsersListTemplate {
     members: Vec<MemberRow>,
     search: Option<String>,
+    discord: Option<String>,
     active_only: bool,
     generation_options: Vec<SelectIdOption>,
     generation_id: i32,
@@ -48,8 +49,8 @@ pub async fn users_list(
     State(state): State<crate::AppState>,
 ) -> Result<UsersListTemplate, Response> {
     let (members, total) = try_join!(
-        crate::db::members::search(&params, &state.db_pool),
-        crate::db::members::count(&params, &state.db_pool)
+        crate::db::members::search(&params, &state),
+        crate::db::members::count(&params, &state)
     )
     .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()).into_response())?;
 
@@ -89,6 +90,7 @@ pub async fn users_list(
         },
         sort_by: params.sort_by,
         sort_desc: params.sort_desc,
+        discord: params.discord,
     })
 }
 
