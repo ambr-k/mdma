@@ -4,15 +4,25 @@ use sea_query::{
     SimpleExpr,
 };
 use sea_query_binder::SqlxBinder;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_inline_default::serde_inline_default;
 use sqlx::prelude::FromRow;
 use time::Date;
 
+fn none_or_empty(val: &Option<String>) -> bool {
+    match val.as_deref() {
+        None => true,
+        Some("") => true,
+        Some(_) => false,
+    }
+}
+
 #[serde_inline_default]
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize, Clone)]
 pub struct MembersQuery {
+    #[serde(skip_serializing_if = "none_or_empty")]
     pub search: Option<String>,
+    #[serde(skip_serializing_if = "none_or_empty")]
     pub discord: Option<String>,
 
     #[serde_inline_default(false)]
@@ -27,8 +37,8 @@ pub struct MembersQuery {
     #[serde_inline_default(-1)]
     pub generation_id: i32,
 
-    #[serde_inline_default(0)]
-    pub sort_by: u64,
+    #[serde_inline_default(String::from(""))]
+    pub sort_by: String,
 
     #[serde_inline_default(false)]
     pub sort_desc: bool,
@@ -158,16 +168,16 @@ pub async fn search(
         .members_query_filter(params)
         .limit(params.count)
         .offset(params.offset)
-        .order_by_columns(match params.sort_by {
-            1 => vec![
+        .order_by_columns(match params.sort_by.as_str() {
+            "firstname" => vec![
                 ((Members::Table, Members::FirstName), sort_order.clone()),
                 ((Members::Table, Members::LastName), sort_order.clone()),
             ],
-            2 => vec![
+            "lastname" => vec![
                 ((Members::Table, Members::LastName), sort_order.clone()),
                 ((Members::Table, Members::FirstName), sort_order.clone()),
             ],
-            3 => vec![(
+            "consecutivesince" => vec![(
                 (Members::Table, Members::ConsecutiveSinceCached),
                 sort_order.clone(),
             )],

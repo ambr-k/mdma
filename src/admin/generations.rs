@@ -26,7 +26,7 @@ pub async fn generations_list(State(state): State<crate::AppState>) -> Markup {
             id AS "id!",
             total_members AS "total_members!",
             active_members AS "active_members!",
-            active_emails AS "active_emails!",
+            COALESCE(active_emails, '{}') AS "active_emails!",
             title,
             start_date
         FROM 
