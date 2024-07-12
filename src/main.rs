@@ -44,7 +44,7 @@ async fn home(cookies: CookieJar) -> Markup {
                         None => a ."btn" href="signin" {"Sign In"},
                         Some(_) => {
                             ul ."menu"."menu-horizontal"."navbar-start" {
-                                li {a hx-get="admin/users"          hx-target="main" {"Users List"}}
+                                li {a hx-get="admin/members"        hx-target="main" {"Users List"}}
                                 li {a hx-get="admin/generations"    hx-target="main" {"Generations"}}
                                 li {a hx-get="admin/bulk_update"    hx-target="main" {"Bulk Update"}}
                             }

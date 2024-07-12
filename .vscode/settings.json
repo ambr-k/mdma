@@ -5,5 +5,6 @@
     "tailwindCSS.experimental.classRegex": [
         "\\w+((?:\\.\\s*\\S+\\s*)*)",
         "\\.\"?([^.\"]+)\"?"
-    ]
+    ],
+    "tailwindCSS.suggestions": false
 }

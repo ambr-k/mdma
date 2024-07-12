@@ -6,12 +6,11 @@ use axum::{
 
 mod bulk_update;
 mod generations;
+mod members;
 mod users;
 
 pub fn router(state: crate::AppState) -> Router {
     Router::new()
-        .route("/users", get(users::users_list))
-        .route("/user/:user_id", get(users::user_details))
         .route(
             "/user/:user_id/payment",
             post(users::add_payment).get(users::user_payment_form),
@@ -23,6 +22,7 @@ pub fn router(state: crate::AppState) -> Router {
             post(bulk_update::submit_givingfuel_bulk_update),
         )
         .with_state(state.clone())
+        .nest("/members", members::router(state.clone()))
         .layer(middleware::from_fn_with_state(
             state.clone(),
             crate::auth::verify_admin,
