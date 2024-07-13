@@ -6,13 +6,7 @@ fn main() {
 
 fn run_tailwind() {
     let result = Command::new("npx")
-        .args([
-            "tailwindcss",
-            "-i",
-            "templates/styles.css",
-            "-o",
-            "static/styles.css",
-        ])
+        .args(["tailwindcss", "-i", "styles.css", "-o", "static/styles.css"])
         .output();
     match result {
         Ok(output) => {
