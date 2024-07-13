@@ -4,7 +4,7 @@ use sea_query::{
     SimpleExpr,
 };
 use sea_query_binder::SqlxBinder;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use serde_inline_default::serde_inline_default;
 use sqlx::prelude::FromRow;
 use time::Date;
@@ -17,6 +17,13 @@ fn none_or_empty(val: &Option<String>) -> bool {
     }
 }
 
+fn deserialize_option_bool<'de, D>(deserializer: D) -> Result<Option<bool>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    Ok(bool::deserialize(deserializer).ok())
+}
+
 #[serde_inline_default]
 #[derive(Deserialize, Serialize, Clone)]
 pub struct MembersQuery {
@@ -25,8 +32,18 @@ pub struct MembersQuery {
     #[serde(skip_serializing_if = "none_or_empty")]
     pub discord: Option<String>,
 
-    #[serde_inline_default(false)]
-    pub active_only: bool,
+    #[serde(
+        deserialize_with = "deserialize_option_bool",
+        skip_serializing_if = "Option::is_none"
+    )]
+    #[serde_inline_default(None)]
+    pub member_status: Option<bool>,
+    #[serde(
+        deserialize_with = "deserialize_option_bool",
+        skip_serializing_if = "Option::is_none"
+    )]
+    #[serde_inline_default(None)]
+    pub discord_status: Option<bool>,
 
     #[serde_inline_default(12)]
     pub count: u64,
@@ -90,13 +107,27 @@ impl MembersQueryFilter for sea_query::SelectStatement {
             |_| {},
         )
         .conditions(
-            params.active_only,
+            params.member_status.is_some(),
             |q| {
-                q.and_where(
-                    Expr::col(Members::ConsecutiveUntilCached)
-                        .gt(Expr::current_date())
-                        .and(Expr::col(Members::ReasonRemoved).is_null()),
-                );
+                let active_expr = Expr::col(Members::ConsecutiveUntilCached)
+                    .gt(Expr::current_date())
+                    .and(Expr::col(Members::ReasonRemoved).is_null());
+                q.and_where(if params.member_status.unwrap() {
+                    active_expr
+                } else {
+                    active_expr.not()
+                });
+            },
+            |_| {},
+        )
+        .conditions(
+            params.discord_status.is_some(),
+            |q| {
+                q.and_where(if params.discord_status.unwrap() {
+                    Expr::col(Members::Discord).is_not_null()
+                } else {
+                    Expr::col(Members::Discord).is_null()
+                });
             },
             |_| {},
         )

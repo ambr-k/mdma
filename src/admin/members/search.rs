@@ -47,8 +47,22 @@ pub async fn members_list(
                     }
                     ."form-control" {
                         label ."label"."cursor-pointer" {
-                            span ."label-text" {"Active Members Only"}
-                            input type="checkbox" name="active_only" value="true" checked[params.active_only] ."checkbox"."checkbox-primary";
+                            span ."label-text" {"Active Status"}
+                            select name="member_status" ."select"."select-bordered" {
+                                option value="" selected[params.member_status.is_none()] {"(Ignore)"}
+                                option value="true" selected[params.member_status==Some(true)] {"Active"}
+                                option value="false" selected[params.member_status==Some(false)] {"Inactive"}
+                            }
+                        }
+                    }
+                    ."form-control" {
+                        label ."label"."cursor-pointer" {
+                            span ."label-text" {"Discord Status"}
+                            select name="discord_status" ."select"."select-bordered" {
+                                option value="" selected[params.discord_status.is_none()] {"(Ignore)"}
+                                option value="true" selected[params.discord_status==Some(true)] {"Registered"}
+                                option value="false" selected[params.discord_status==Some(false)] {"Unregistered"}
+                            }
                         }
                     }
                     ."form-control" {
