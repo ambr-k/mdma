@@ -108,7 +108,7 @@ pub async fn details(
         @if let Some(val) = member.consecutive_since_cached {
             p {"Active since "(val)" ("(member.generation_name.as_deref().unwrap_or("Generation N/A"))")"}
         }
-        @if let Some(val) = member.consecutive_since_cached {
+        @if let Some(val) = member.consecutive_until_cached {
             p {"Active until "(val)}
         }
         ."divider" {"Third-Party Accounts"}
@@ -144,6 +144,6 @@ pub async fn details(
             }
         }
         ."divider" {"Actions"}
-        button ."btn"."btn-secondary"."btn-outline" onclick="openModal()" hx-get={"admin/user/"(member.id)"/payment"} hx-target="#modal-content" {"Add Payment"}
+        button ."btn"."btn-secondary"."btn-outline" onclick="openModal()" hx-get={"admin/members/new_payment/"(member.id)} hx-target="#modal-content" {"Add Payment"}
     })
 }

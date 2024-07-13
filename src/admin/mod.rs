@@ -7,14 +7,9 @@ use axum::{
 mod bulk_update;
 mod generations;
 mod members;
-mod users;
 
 pub fn router(state: crate::AppState) -> Router {
     Router::new()
-        .route(
-            "/user/:user_id/payment",
-            post(users::add_payment).get(users::user_payment_form),
-        )
         .route("/generations", get(generations::generations_list))
         .route("/bulk_update", get(bulk_update::bulk_update_form))
         .route(
