@@ -1,9 +1,8 @@
-use askama_axum::IntoResponse;
 use axum::{
     extract::{Query, Request, State},
     http::StatusCode,
     middleware::Next,
-    response::{Redirect, Response},
+    response::{IntoResponse, Redirect, Response},
 };
 use axum_extra::extract::{cookie::Cookie, CookieJar};
 use jsonwebtoken::Validation;

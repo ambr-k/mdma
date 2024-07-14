@@ -1,11 +1,10 @@
 use std::str::FromStr;
 
-use askama_axum::IntoResponse;
 use axum::{
     body::Bytes,
     extract::State,
     http::{HeaderMap, StatusCode},
-    response::Response,
+    response::{IntoResponse, Response},
 };
 use reqwest::header;
 use rust_decimal::Decimal;

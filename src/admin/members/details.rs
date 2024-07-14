@@ -1,7 +1,6 @@
-use askama_axum::IntoResponse as _;
 use axum::{
     extract::{Path, State},
-    response::Response,
+    response::{IntoResponse, Response},
 };
 use maud::{html, Markup};
 use reqwest::StatusCode;

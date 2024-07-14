@@ -1,10 +1,9 @@
-use askama_axum::IntoResponse;
 use axum::{
     body::Body,
     extract::{Request, State},
     http::StatusCode,
     middleware::Next,
-    response::Response,
+    response::{IntoResponse, Response},
 };
 use hmac::{Hmac, Mac};
 use sha2::Sha256;

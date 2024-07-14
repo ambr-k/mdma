@@ -1,11 +1,10 @@
 use std::collections::HashSet;
 
 use crate::icons;
-use askama_axum::IntoResponse;
 use axum::{
     extract::{Multipart, State},
     http::StatusCode,
-    response::Response,
+    response::{IntoResponse, Response},
     Extension,
 };
 use maud::{html, Markup};
