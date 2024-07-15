@@ -26,6 +26,7 @@ struct DbMember {
 
 async fn whois(
     user_id: UserId,
+    mdma_url: &str,
     db_pool: &sqlx::PgPool,
 ) -> Result<CreateInteractionResponse, StatusCode> {
     let result = sqlx::query_as!(
@@ -50,6 +51,12 @@ async fn whois(
                 .flags(InteractionResponseFlags::SUPPRESS_NOTIFICATIONS)
                 .ephemeral(true)
                 .content(format!("<@{}> is registered in MDMA", user_id.get()))
+                .button(
+                    CreateButton::new_link(format!(
+                        "https://{mdma_url}/admin/members/search?discord={user_id}"
+                    ))
+                    .label("Open in MDMA"),
+                )
                 .add_embeds(
                     result
                         .iter()
@@ -205,6 +212,7 @@ async fn handle_slash_command(
                     Some(CommandDataOptionValue::User(user)) => *user,
                     _ => return Err(StatusCode::BAD_REQUEST),
                 },
+                state.secret_store.get("MDMA_URL").unwrap().as_str(),
                 &state.db_pool,
             )
             .await
@@ -216,6 +224,7 @@ async fn handle_slash_command(
                     Some(tid) => tid.to_user_id(),
                     None => return Err(StatusCode::BAD_REQUEST),
                 },
+                state.secret_store.get("MDMA_URL").unwrap().as_str(),
                 &state.db_pool,
             )
             .await

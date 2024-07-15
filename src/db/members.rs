@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use rust_decimal::Decimal;
 use sea_query::{
     extension::postgres::PgExpr, Alias, Asterisk, Expr, Iden, Order, PostgresQueryBuilder, Query,
@@ -166,7 +168,11 @@ impl MembersQueryFilter for sea_query::SelectStatement {
         self.conditions(
             userids.is_some(),
             |q| {
-                q.and_where(Expr::col(Members::Discord).is_in(userids.unwrap()));
+                let username_matches = Expr::col(Members::Discord).is_in(userids.unwrap());
+                q.and_where(match Decimal::from_str(discord.as_deref().unwrap()) {
+                    Ok(userid) => username_matches.or(Expr::col(Members::Discord).eq(userid)),
+                    Err(_) => username_matches,
+                });
             },
             |_| {},
         )
