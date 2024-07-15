@@ -1,5 +1,6 @@
 use axum::{
-    extract::{Query, State},
+    extract::{NestedPath, Query, State},
+    http::HeaderMap,
     response::{IntoResponse, Response},
 };
 use maud::{html, Markup};
@@ -19,6 +20,7 @@ pub struct PaginationRequest {
 }
 
 pub async fn members_list(
+    nest: NestedPath,
     Query(params): Query<MembersQuery>,
     State(state): State<crate::AppState>,
 ) -> Markup {
@@ -35,7 +37,7 @@ pub async fn members_list(
             input type="radio" name="members-list-accordion" checked;
             ."collapse-title"."text-xl"."font-medium" {"Search Members"}
             ."collapse-content" {
-                form ."[&>*]:my-3" hx-get="admin/members/search" hx-target="#members-search-results" hx-trigger="load, submit" {
+                form ."[&>*]:my-3" hx-get={(nest.as_str())"/search"} hx-target="#members-search-results" hx-push-url="true" {
                     label ."input"."input-bordered"."flex"."items-center"."gap-2" {
                         input type="text" name="search" placeholder="Search" value=[&params.search] ."grow"."bg-inherit";
                         span ."text-secondary" {(icons::search())}
@@ -98,14 +100,20 @@ pub async fn members_list(
             }
         }
         ."divider" {}
-        #"members-search-results" {}
+        #"members-search-results" hx-get={(nest.as_str())"/search"} hx-trigger="load" hx-vals=(serde_json::to_string(&params).unwrap())  {}
     }}
 }
 
 pub async fn search_results(
+    headers: HeaderMap,
+    nest: NestedPath,
     Query(params): Query<MembersQuery>,
     State(state): State<crate::AppState>,
 ) -> Result<Markup, Response> {
+    if headers.contains_key("X-Rebuild-Page") {
+        return Ok(members_list(nest, Query(params), State(state)).await);
+    }
+
     let (members, total) = try_join!(
         crate::db::members::search(&params, &state),
         crate::db::members::count(&params, &state)
@@ -115,7 +123,7 @@ pub async fn search_results(
     let pagebtn = |request_opt: Option<PaginationRequest>, text: &str| -> Markup {
         html! {
             @if let Some(request) = request_opt {
-                button ."btn"."btn-outline"."join-item"."w-1/4" hx-get="admin/members/search" hx-target="#members-search-results"
+                button ."btn"."btn-outline"."join-item"."w-1/4" hx-get={(nest.as_str())"/search"} hx-target="#members-search-results"
                     hx-vals=(serde_json::to_string(&MembersQuery {count: request.count, offset: request.offset, ..params.clone()}).unwrap()) {(text)}
             }
             @else { button ."btn"."btn-outline"."join-item"."w-1/4" disabled {(text)}}
@@ -142,7 +150,7 @@ pub async fn search_results(
         @for member in &members {
             ."collapse"."collapse-arrow"."bg-base-200"."my-2" {
                 input #{"user_details_trigger_"(member.id)} type="radio" name="members-list-accordion"
-                    hx-get={"admin/members/details/"(member.id)} hx-target="next .collapse-content" hx-indicator="closest .collapse";
+                    hx-get={(nest.as_str())"/details/"(member.id)} hx-target="next .collapse-content" hx-indicator="closest .collapse";
                 ."collapse-title"."text-xl"."font-medium" {(member.last_name)", "(member.first_name)}
                 #{"user_details_"(member.id)} ."collapse-content" { progress ."progress"."htmx-indicator" {} }
             }

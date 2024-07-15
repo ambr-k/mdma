@@ -119,7 +119,7 @@ pub async fn oauth_callback(
     )
     .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()).into_response())?;
 
-    Ok((cookies.add(Cookie::new("jwt", jwt)), Redirect::to("/")))
+    Ok((cookies.add(Cookie::new("jwt", jwt)), Redirect::to("/admin")))
 }
 
 pub async fn verify_admin(

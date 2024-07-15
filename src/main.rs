@@ -1,16 +1,18 @@
 use std::{str::FromStr, sync::Arc};
 
 use axum::{
+    response::{IntoResponse, Redirect, Response},
     routing::{get, post},
     Router,
 };
 use axum_extra::extract::CookieJar;
-use maud::{html, Markup, PreEscaped, DOCTYPE};
+use maud::html;
 use shuttle_runtime::{CustomError, SecretStore};
 use tower_http::services::ServeDir;
 
 mod admin;
 mod auth;
+mod components;
 mod db;
 mod discord;
 mod icons;
@@ -27,48 +29,16 @@ struct AppState {
     discord_guild: serenity::model::id::GuildId,
 }
 
-async fn home(cookies: CookieJar) -> Markup {
-    html! {
-        (DOCTYPE)
-        html {
-            head {
-                meta charset="UTF-8";
-                meta name="viewport" content="width=device-width, initial-scale=1.0";
-                meta http-equiv="X-UA-Compatible" content="ie=edge";
-                title {"Membership Database Management Application"}
-                link rel="stylesheet" href="./assets/styles.css";
-            }
-            body {
-                header ."navbar"."bg-base-300"."lg:rounded-box"."lg:m-3"."lg:w-auto" {
-                    @match cookies.get("jwt") {
-                        None => a ."btn" href="signin" {"Sign In"},
-                        Some(_) => {
-                            ul ."menu"."menu-horizontal"."navbar-start" {
-                                li {a hx-get="admin/members"        hx-target="main" {"Members List"}}
-                                li {a hx-get="admin/generations"    hx-target="main" {"Generations"}}
-                                li {a hx-get="admin/bulk_update"    hx-target="main" {"Bulk Update"}}
-                            }
-                            ul ."menu"."menu-horizontal"."navbar-end" {
-                                li {a href="signout" {"Sign Out"}}
-                            }
-                        }
-                    }
-                }
-                main ."my-2"."lg:mx-4" {}
-                dialog #"modal"."modal"."modal-bottom"."sm:modal-middle" {
-                    ."modal-box" {
-                        form method="dialog" { button ."btn"."btn-sm"."btn-circle"."btn-ghost"."absolute"."right-2"."top-2" {"✕"} }
-                        progress #"modal-loading"."progress"."mt-6"."[&:has(+#modal-content:not(:empty)):not(.htmx-request)]:hidden" {}
-                        div #"modal-content" {}
-                    }
-                    script {(PreEscaped("function openModal() { $('#modal-content').empty(); $('#modal')[0].showModal(); }"))}
-                    form method="dialog" ."modal-backdrop" { button {"CLOSE"} }
-                }
-                #"alerts"."toast" {}
-                script src="https://unpkg.com/htmx.org@1.9.9" {}
-                script src="https://code.jquery.com/jquery-3.7.1.slim.min.js" {}
-            }
-        }
+async fn home(cookies: CookieJar) -> Response {
+    match cookies.get("jwt") {
+        None => components::layout(
+            html! {
+                a ."btn" href="/signin" {"Sign In"}
+            },
+            None,
+        )
+        .into_response(),
+        Some(_) => Redirect::to("/admin").into_response(),
     }
 }
 

@@ -1,5 +1,5 @@
 use axum::{
-    extract::{Path, State},
+    extract::{NestedPath, Path, State},
     response::{IntoResponse, Response},
     Form,
 };
@@ -12,6 +12,7 @@ use time::Date;
 use crate::{db::members::MemberRow, icons};
 
 pub async fn payment_form(
+    nest: NestedPath,
     Path(member_id): Path<i32>,
     State(state): State<crate::AppState>,
 ) -> Result<Markup, Response> {
@@ -36,7 +37,7 @@ pub async fn payment_form(
         h2 ."text-lg" {(member.email)}
         ."form-response" {}
         ."divider" {}
-        form ."mt-3" hx-post={"admin/members/new_payment/"(member.id)} hx-target="previous .form-response" hx-indicator="#modal-loading" {
+        form ."mt-3" hx-post={(nest.as_str())"/new_payment/"(member.id)} hx-target="previous .form-response" hx-indicator="#modal-loading" {
             ."form-control" {
                 label ."label"."cursor-pointer" {
                     span ."label-text" {"Payment Method / Reason"}

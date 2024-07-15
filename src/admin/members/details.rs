@@ -1,5 +1,5 @@
 use axum::{
-    extract::{Path, State},
+    extract::{NestedPath, Path, State},
     response::{IntoResponse, Response},
 };
 use maud::{html, Markup};
@@ -27,6 +27,7 @@ struct WebconnexCustomerSearchResponse {
 }
 
 pub async fn details(
+    nest: NestedPath,
     Path(member_id): Path<i32>,
     State(state): State<crate::AppState>,
 ) -> Result<Markup, Response> {
@@ -143,6 +144,6 @@ pub async fn details(
             }
         }
         ."divider" {"Actions"}
-        button ."btn"."btn-secondary"."btn-outline" onclick="openModal()" hx-get={"admin/members/new_payment/"(member.id)} hx-target="#modal-content" {"Add Payment"}
+        button ."btn"."btn-secondary"."btn-outline" onclick="openModal()" hx-get={(nest.as_str())"/new_payment/"(member.id)} hx-target="#modal-content" {"Add Payment"}
     })
 }
