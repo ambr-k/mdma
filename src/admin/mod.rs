@@ -11,6 +11,7 @@ use maud::{html, Markup};
 use crate::components;
 
 mod bulk_update;
+mod discord_audit;
 mod generations;
 mod members;
 
@@ -20,6 +21,7 @@ fn home(nest: &str, load_main: Option<Uri>) -> Markup {
             ul ."menu"."menu-horizontal"."navbar-start" {
                 li {a hx-get={(nest)"/members"}        hx-target="main" hx-push-url="true" {"Members List"}}
                 li {a hx-get={(nest)"/generations"}    hx-target="main" hx-push-url="true" {"Generations"}}
+                li {a hx-get={(nest)"/discord_audit"}  hx-target="main" hx-push-url="true" {"Discord Audit"}}
                 li {a hx-get={(nest)"/bulk_update"}    hx-target="main" hx-push-url="true" {"Bulk Update"}}
             }
             ul ."menu"."menu-horizontal"."navbar-end" {
@@ -60,6 +62,7 @@ pub fn router(state: crate::AppState) -> Router {
         )
         .with_state(state.clone())
         .nest("/members", members::router(state.clone()))
+        .nest("/discord_audit", discord_audit::router(state.clone()))
         .layer(middleware::from_fn(handle_nonhtmx_request))
         .route("/", get(home_no_contents))
         .layer(middleware::from_fn_with_state(
