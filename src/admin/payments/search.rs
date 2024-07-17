@@ -18,6 +18,22 @@ pub async fn search_form(nest: NestedPath, Query(params): Query<PaymentsQuery>) 
                     input type="text" name="member_search" placeholder="Search by Member" value=[&params.member_search] ."grow"."bg-inherit";
                     span ."text-secondary" {(icons::search())}
                 }
+                ."divider" {"Sort Results"}
+                ."form-control" {
+                    label ."label"."cursor-pointer" {
+                        span ."label-text" {"Sort By"}
+                        select name="sort_by" ."select"."select-bordered" {
+                            option value="effective_on" selected[params.sort_by=="effective_on"] {"Effective Date"}
+                            option value="amount_paid" selected[params.sort_by=="amount_paid"] {"Amount Paid"}
+                        }
+                    }
+                }
+                ."form-control" {
+                    label ."label"."cursor-pointer" {
+                        span ."label-text" {"Descending"}
+                        input type="checkbox" name="sort_desc" value="true" checked[params.sort_desc] ."checkbox"."checkbox-primary";
+                    }
+                }
                 ."card-actions"."justify-center" {
                     button ."btn"."btn-primary"."w-1/2"."block"."mx-auto"."!mb-0" {"SEARCH"}
                 }

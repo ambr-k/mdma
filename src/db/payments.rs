@@ -2,7 +2,8 @@ use std::str::FromStr;
 
 use rust_decimal::Decimal;
 use sea_query::{
-    extension::postgres::PgExpr, Asterisk, Expr, Iden, PostgresQueryBuilder, Query, SimpleExpr,
+    extension::postgres::PgExpr, Asterisk, Expr, Iden, Order, PostgresQueryBuilder, Query,
+    SimpleExpr,
 };
 use sea_query_binder::SqlxBinder;
 use serde::{Deserialize, Serialize};
@@ -22,6 +23,10 @@ pub struct PaymentsQuery {
     pub count: u64,
     #[serde_inline_default(0)]
     pub offset: u64,
+    #[serde_inline_default(String::from("effective_on"))]
+    pub sort_by: String,
+    #[serde_inline_default(false)]
+    pub sort_desc: bool,
 }
 
 #[derive(FromRow)]
@@ -79,6 +84,12 @@ pub async fn search(
     params: &PaymentsQuery,
     state: &crate::AppState,
 ) -> Result<Vec<PaymentRow>, sqlx::Error> {
+    let sort_order = if params.sort_desc {
+        Order::Desc
+    } else {
+        Order::Asc
+    };
+
     let (query, values) = Query::select()
         .column((Payments::Table, Asterisk))
         .column((Members::Table, Asterisk))
@@ -88,6 +99,14 @@ pub async fn search(
             Expr::col(Payments::MemberId).equals((Members::Table, Members::Id)),
         )
         .payments_query_filter(params)
+        .order_by(
+            match params.sort_by.as_str() {
+                "effective_on" => Payments::EffectiveOn,
+                "amount_paid" => Payments::AmountPaid,
+                _ => Payments::Id,
+            },
+            sort_order,
+        )
         .limit(params.count)
         .offset(params.offset)
         .build_sqlx(PostgresQueryBuilder);
