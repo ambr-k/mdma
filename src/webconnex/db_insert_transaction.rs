@@ -5,6 +5,7 @@ use axum::{
 
 use super::request_payload;
 
+#[derive(serde::Serialize)]
 pub struct InsertTransactionResponse {
     pub id: i32,
     pub member_id: i32,

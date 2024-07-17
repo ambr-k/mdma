@@ -5,6 +5,7 @@ use axum::{
 
 use super::request_payload;
 
+#[derive(serde::Serialize)]
 pub struct SqlCreateResponse {
     pub id: i32,
 }
