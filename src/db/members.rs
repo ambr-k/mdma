@@ -250,7 +250,7 @@ pub async fn count(params: &MembersQuery, state: &crate::AppState) -> Result<u64
 
 #[allow(dead_code)]
 #[derive(Iden)]
-enum Members {
+pub enum Members {
     Table,
     Id,
     Email,

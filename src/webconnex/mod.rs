@@ -3,6 +3,7 @@ mod db_create_user;
 mod db_insert_transaction;
 mod new_member;
 mod recurring_payment_success;
+mod redirect;
 mod request_payload;
 
 use axum::{middleware::from_fn_with_state, routing::post, Router};
@@ -35,5 +36,6 @@ pub fn router(state: crate::AppState) -> Router {
             post(recurring_payment_success::webhook_handler)
                 .route_layer(from_fn_with_state(recurring_success_ver_state, ver_sig)),
         )
-        .with_state(state)
+        .with_state(state.clone())
+        .nest("/redirect", redirect::router(state.clone()))
 }

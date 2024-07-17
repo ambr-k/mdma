@@ -15,7 +15,7 @@ pub fn layout(navbar_options: Markup, main_content: Option<Markup>) -> Markup {
                 header ."navbar"."bg-base-300"."lg:rounded-box"."lg:m-3"."lg:w-auto" {
                     (navbar_options)
                 }
-                main ."my-2"."lg:mx-4" { @if let Some(content) = main_content { (content) } }
+                main #"main_content" ."my-2"."lg:mx-4" { @if let Some(content) = main_content { (content) } }
                 dialog #"modal"."modal"."modal-bottom"."sm:modal-middle" {
                     ."modal-box" {
                         form method="dialog" { button ."btn"."btn-sm"."btn-circle"."btn-ghost"."absolute"."right-2"."top-2" {"✕"} }

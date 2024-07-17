@@ -13,12 +13,14 @@ use crate::components;
 mod bulk_update;
 mod generations;
 mod members;
+mod payments;
 
 fn home(nest: &str, load_main: Option<Uri>) -> Markup {
     components::layout(
         html! {
             ul ."menu"."menu-horizontal"."navbar-start" {
-                li {a hx-get={(nest)"/members"}        hx-target="main" hx-push-url="true" {"Members List"}}
+                li {a hx-get={(nest)"/members"}        hx-target="main" hx-push-url="true" {"Members"}}
+                li {a hx-get={(nest)"/payments"}        hx-target="main" hx-push-url="true" {"Payments"}}
                 li {a hx-get={(nest)"/generations"}    hx-target="main" hx-push-url="true" {"Generations"}}
                 li {a hx-get={(nest)"/bulk_update"}    hx-target="main" hx-push-url="true" {"Bulk Update"}}
             }
@@ -60,6 +62,7 @@ pub fn router(state: crate::AppState) -> Router {
         )
         .with_state(state.clone())
         .nest("/members", members::router(state.clone()))
+        .nest("/payments", payments::router(state.clone()))
         .layer(middleware::from_fn(handle_nonhtmx_request))
         .route("/", get(home_no_contents))
         .layer(middleware::from_fn_with_state(

@@ -145,5 +145,6 @@ pub async fn details(
         }
         ."divider" {"Actions"}
         button ."btn"."btn-secondary"."btn-outline" onclick="openModal()" hx-get={(nest.as_str())"/new_payment/"(member.id)} hx-target="#modal-content" {"Add Payment"}
+        a href={"/admin/payments?member_search="(member.id)} ."btn"."btn-secondary"."btn-outline"."mx-2" {"View Payments"}
     })
 }
