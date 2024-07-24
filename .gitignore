@@ -18,5 +18,6 @@ node_modules
 .env
 Secrets.toml
 Secrets.*.toml
+.shuttle-storage
 
 .sqlx/

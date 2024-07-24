@@ -7,6 +7,7 @@ use axum::{
 };
 use axum_extra::extract::CookieJar;
 use maud::html;
+use shuttle_persist::PersistInstance;
 use shuttle_runtime::{CustomError, SecretStore};
 use tower_http::services::ServeDir;
 
@@ -27,6 +28,7 @@ struct AppState {
     discord_verifier: serenity::interactions_endpoint::Verifier,
     discord_http: Arc<serenity::http::Http>,
     discord_guild: serenity::model::id::GuildId,
+    persist: PersistInstance,
 }
 
 async fn home(cookies: CookieJar) -> Response {
@@ -46,6 +48,7 @@ async fn home(cookies: CookieJar) -> Response {
 async fn main(
     #[shuttle_shared_db::Postgres] db_pool: sqlx::PgPool,
     #[shuttle_runtime::Secrets] secret_store: SecretStore,
+    #[shuttle_persist::Persist] persist: PersistInstance,
 ) -> shuttle_axum::ShuttleAxum {
     sqlx::migrate!()
         .run(&db_pool)
@@ -90,6 +93,7 @@ async fn main(
         discord_verifier,
         discord_http,
         discord_guild,
+        persist,
     };
 
     discord::create_commands(&state).await;
