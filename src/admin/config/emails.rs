@@ -1,11 +1,13 @@
 use axum::{
-    extract::{NestedPath, State},
+    extract::{NestedPath, Query, State},
+    response::{IntoResponse, Response},
     Form,
 };
-use maud::{html, Markup};
+use maud::{html, Markup, PreEscaped};
+use reqwest::StatusCode;
 use serde::Deserialize;
 
-use crate::icons;
+use crate::{icons, send_email::sanitize_email};
 
 pub fn discord_email_form(nest: NestedPath) -> Markup {
     html! {
@@ -34,13 +36,23 @@ pub async fn set_discord_email(
     State(state): State<crate::AppState>,
     Form(form): Form<DiscordEmailFormData>,
 ) -> Markup {
-    let content = ammonia::clean(&form.email_body);
+    let content = sanitize_email(&form.email_body);
     match state.persist.save("discord_email", content) {
         Ok(_) => html! {
-            ."alert"."alert-success" {(icons::success()) span {"Successfully update email contents!"}}
+            ."alert"."alert-success" {(icons::success()) span {"Successfully updated email contents!"}}
         },
         Err(err) => html! {
             ."alert"."alert-error" {(icons::error()) span {(err)}}
         },
+    }
+}
+
+pub async fn populate_discord_email(
+    State(state): State<crate::AppState>,
+    Query(params): Query<crate::send_email::EmailValues>,
+) -> Response {
+    match crate::send_email::populate_discord_email(&params, &state.persist) {
+        Ok(populated) => PreEscaped(populated).into_response(),
+        Err(err) => (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()).into_response(),
     }
 }

@@ -25,5 +25,9 @@ pub fn router(state: crate::AppState) -> Router {
             "/discord_email",
             get(emails::get_discord_email).post(emails::set_discord_email),
         )
+        .route(
+            "/discord_email/populate",
+            get(emails::populate_discord_email),
+        )
         .with_state(state.clone())
 }

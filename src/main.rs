@@ -17,6 +17,7 @@ mod components;
 mod db;
 mod discord;
 mod icons;
+mod send_email;
 mod webconnex;
 
 #[derive(Clone)]
