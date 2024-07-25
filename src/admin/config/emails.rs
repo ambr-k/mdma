@@ -1,29 +1,28 @@
 use axum::{
-    extract::{NestedPath, Query, State},
+    extract::{NestedPath, Path, Query, State},
     response::{IntoResponse, Response},
     Form,
 };
-use lettre::{
-    message::{Mailbox, SinglePart},
-    AsyncTransport,
-};
+use lettre::{message::Mailbox, AsyncTransport};
 use maud::{html, Markup};
 use reqwest::StatusCode;
 use serde::Deserialize;
 
 use crate::{
     icons,
-    send_email::{
-        build_mailer, build_message, populate_discord_email, sanitize_email, EmailValues,
-    },
+    send_email::{build_mailer, build_message, sanitize_email, EmailValues},
 };
 
-pub async fn discord_email_form(nest: NestedPath, State(state): State<crate::AppState>) -> Markup {
+pub async fn email_contents_form(
+    nest: NestedPath,
+    Path(email_key): Path<String>,
+    State(state): State<crate::AppState>,
+) -> Markup {
     html! {
-        #"discord_email_results" {}
-        form hx-post={(nest.as_str())"/discord_email"} hx-target="#discord_email_results" {
+        #{(email_key)"_email_results"} {}
+        form hx-post={(nest.as_str())"/email_contents/"(email_key)} hx-target={"#"(email_key)"_email_results"} {
             textarea name="email_body" ."textarea"."textarea-primary"."font-mono"."my-4"."w-full" required {
-                (state.persist.load::<String>("discord_email").unwrap_or_default())
+                (state.persist.load::<String>(&format!("email.{email_key}")).unwrap_or_default())
             }
             button ."btn"."btn-primary"."w-1/2"."block"."mx-auto"."!mb-0" {"UPDATE"}
         }
@@ -31,16 +30,17 @@ pub async fn discord_email_form(nest: NestedPath, State(state): State<crate::App
 }
 
 #[derive(Deserialize)]
-pub struct DiscordEmailFormData {
+pub struct EmailFormData {
     email_body: String,
 }
 
-pub async fn set_discord_email(
+pub async fn set_email_contents(
+    Path(email_key): Path<String>,
     State(state): State<crate::AppState>,
-    Form(form): Form<DiscordEmailFormData>,
+    Form(form): Form<EmailFormData>,
 ) -> Markup {
     let content = sanitize_email(&form.email_body);
-    match state.persist.save("discord_email", content) {
+    match state.persist.save(&format!("email.{email_key}"), content) {
         Ok(_) => html! {
             ."alert"."alert-success" {(icons::success()) span {"Successfully updated email contents!"}}
         },
@@ -110,31 +110,26 @@ pub struct SendEmailParams {
     pub email: String,
 }
 
-pub async fn send_discord_email(
+pub async fn send_email(
+    Path(email_key): Path<String>,
     State(state): State<crate::AppState>,
     Query(params): Query<SendEmailParams>,
 ) -> Result<Response, Response> {
     let mailer = build_mailer(&state)
         .await
         .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err).into_response())?;
-    let message = build_message(&state)
-        .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err).into_response())?
-        .to(params
-            .email
-            .parse::<Mailbox>()
-            .map_err(|err| (StatusCode::BAD_REQUEST, err.to_string()).into_response())?)
-        .subject("Psychedelic Club Discord")
-        .singlepart(SinglePart::html(
-            populate_discord_email(
-                &EmailValues {
-                    first_name: params.first_name,
-                    invite_url: params.invite_url,
-                },
-                &state.persist,
-            )
-            .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()).into_response())?,
-        ))
-        .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()).into_response())?;
+    let values = EmailValues {
+        first_name: params.first_name,
+        invite_url: params.invite_url,
+    };
+    let message = build_message(
+        &email_key,
+        "Psychedelic Club Discord",
+        &params.email,
+        &values,
+        &state,
+    )
+    .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err).into_response())?;
     mailer
         .send(message)
         .await

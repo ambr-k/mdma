@@ -1,5 +1,5 @@
 use lettre::{
-    message::{Mailbox, MessageBuilder},
+    message::{Mailbox, SinglePart},
     transport::smtp::authentication::{Credentials, Mechanism},
     AsyncSmtpTransport, Message, Tokio1Executor,
 };
@@ -21,11 +21,14 @@ pub fn sanitize_email(contents: &str) -> String {
         .to_string()
 }
 
-pub fn populate_discord_email(
+pub fn populate_email(
+    email_key: &str,
     values: &EmailValues,
     persist: &PersistInstance,
 ) -> Result<String, tinytemplate::error::Error> {
-    let raw_contents = persist.load::<String>("discord_email").unwrap_or_default();
+    let raw_contents = persist
+        .load::<String>(&format!("email.{email_key}"))
+        .unwrap_or_default();
     let mut templ = TinyTemplate::new();
     templ.add_template("discord_email", &raw_contents)?;
     templ
@@ -60,7 +63,13 @@ pub async fn build_mailer(
     )
 }
 
-pub fn build_message(state: &crate::AppState) -> Result<MessageBuilder, String> {
+pub fn build_message(
+    email_key: &str,
+    subject: &str,
+    to_address: &str,
+    values: &EmailValues,
+    state: &crate::AppState,
+) -> Result<Message, String> {
     let from_mbox = state
         .persist
         .load::<String>("from_address")
@@ -73,5 +82,17 @@ pub fn build_message(state: &crate::AppState) -> Result<MessageBuilder, String> 
         .map_err(|err| err.to_string())?
         .parse::<Mailbox>()
         .map_err(|err| err.to_string())?;
-    Ok(Message::builder().from(from_mbox).reply_to(replyto_mbox))
+    let to_mbox = to_address
+        .parse::<Mailbox>()
+        .map_err(|err| err.to_string())?;
+
+    Message::builder()
+        .from(from_mbox)
+        .reply_to(replyto_mbox)
+        .to(to_mbox)
+        .subject(subject)
+        .singlepart(SinglePart::html(
+            populate_email(email_key, values, &state.persist).map_err(|err| err.to_string())?,
+        ))
+        .map_err(|err| err.to_string())
 }

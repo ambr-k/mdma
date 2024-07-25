@@ -17,8 +17,13 @@ async fn home(nest: NestedPath) -> Markup {
             ."collapse-content" {}
         }
         ."collapse"."collapse-arrow"."bg-base-200"."my-4"."border"."border-secondary" {
-            input type="radio" name="config-accordion" hx-get={(nest.as_str())"/discord_email"} hx-target="next .collapse-content";
+            input type="radio" name="config-accordion" hx-get={(nest.as_str())"/email_contents/discord"} hx-target="next .collapse-content";
             ."collapse-title"."text-xl"."font-medium" {"Discord Email Contents"}
+            ."collapse-content" {}
+        }
+        ."collapse"."collapse-arrow"."bg-base-200"."my-4"."border"."border-secondary" {
+            input type="radio" name="config-accordion" hx-get={(nest.as_str())"/email_contents/board_notif"} hx-target="next .collapse-content";
+            ."collapse-title"."text-xl"."font-medium" {"Exec Board Notification Email Contents"}
             ."collapse-content" {}
         }
     }}
@@ -28,10 +33,10 @@ pub fn router(state: crate::AppState) -> Router {
     Router::new()
         .route("/", get(home))
         .route(
-            "/discord_email",
-            get(emails::discord_email_form).post(emails::set_discord_email),
+            "/email_contents/:email_key",
+            get(emails::email_contents_form).post(emails::set_email_contents),
         )
-        .route("/discord_email/send", get(emails::send_discord_email))
+        .route("/send_email/:email_key", get(emails::send_email))
         .route(
             "/email_addresses",
             get(emails::email_addresses_form).post(emails::set_email_addresses),
