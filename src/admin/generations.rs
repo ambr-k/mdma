@@ -72,7 +72,7 @@ pub async fn generations_list(State(state): State<crate::AppState>) -> Markup {
                         td {(gen.total_members)}
                         td {(gen.active_members)}
                         td {(format!("{:.1}", gen.percent_active() * 100.0)) "%"}
-                        td ."[&>*]:mx-1" {
+                        td ."*:mx-1" {
                             ."tooltip" data-tip="Email Active Members" {
                                 a ."btn"."btn-circle"."btn-outline"."btn-secondary"
                                     href={"mailto:?bcc=" (gen.active_emails.join(","))}
@@ -95,7 +95,7 @@ pub async fn generations_list(State(state): State<crate::AppState>) -> Markup {
                     td {(total_members)}
                     td {(active_members)}
                     td {(format!("{:.1}", active_members as f64 / total_members as f64 * 100.0)) "%"}
-                    td ."rounded-br-lg"."[&>*]:mx-1" {
+                    td ."rounded-br-lg"."*:mx-1" {
                         ."tooltip" data-tip="Email Active Members" {
                             a ."btn"."btn-circle"."btn-outline"."btn-primary"
                                 href={"mailto:?bcc=" (all_emails)}

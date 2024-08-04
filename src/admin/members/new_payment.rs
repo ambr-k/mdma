@@ -18,10 +18,8 @@ pub async fn payment_form(
 ) -> Result<Markup, Response> {
     let member = sqlx::query_as!(
         MemberRow,
-        r#" SELECT members.*, generations.title AS generation_name
+        r#" SELECT members.*, NULL AS "generation_name?"
             FROM members
-                INNER JOIN member_generations ON members.id = member_id
-                INNER JOIN generations ON generations.id = generation_id
             WHERE members.id=$1"#,
         member_id
     )
@@ -121,7 +119,7 @@ pub async fn add_payment(
                     ", user_id)))}
                 }
             }
-            div hx-swap-oob="beforeend:#alerts" {
+            div hx-swap-oob="afterbegin:#alerts" {
                 #{"alert_payment_success_"(transaction_id)}."alert"."alert-success"."transition-opacity"."duration-300" role="alert" {
                     (icons::success())
                     span {"Payment Added Successfully"}

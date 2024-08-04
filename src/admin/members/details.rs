@@ -33,10 +33,10 @@ pub async fn details(
 ) -> Result<Markup, Response> {
     let member = sqlx::query_as!(
         MemberRow,
-        r#" SELECT members.*, generations.title AS generation_name
+        r#" SELECT members.*, generations.title AS "generation_name?"
             FROM members
-                INNER JOIN member_generations ON members.id = member_id
-                INNER JOIN generations ON generations.id = generation_id
+                LEFT JOIN member_generations ON members.id = member_id
+                LEFT JOIN generations ON generations.id = generation_id
             WHERE members.id=$1"#,
         member_id
     )
@@ -111,6 +111,7 @@ pub async fn details(
         @if let Some(val) = member.consecutive_until_cached {
             p {"Active until "(val)}
         }
+        @if member.consecutive_until_cached.is_none() { p {"No recorded payments"} }
         ."divider" {"Third-Party Accounts"}
         @for wc_account in webconnex {
             a ."btn"."btn-outline"."btn-primary" href={"https://manage.webconnex.com/contacts/"(wc_account.id)} target="_blank" {"GivingFuel ID "(wc_account.id)}

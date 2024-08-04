@@ -32,12 +32,13 @@ pub async fn members_list(
     .await
     .unwrap();
 
-    html! { #"members-list" ."w-full"."max-w-xl"."mx-auto" {
+    html! {
+    #"members-list" ."w-full"."max-w-xl"."mx-auto" {
         #"members-search" ."collapse"."collapse-arrow"."bg-base-200"."my-2"."border"."border-secondary" {
             input type="radio" name="members-list-accordion" checked;
             ."collapse-title"."text-xl"."font-medium" {"Search Members"}
             ."collapse-content" {
-                form ."[&>*]:my-3" hx-get={(nest.as_str())"/search"} hx-target="#members-search-results" hx-push-url="true" {
+                form ."*:my-3" hx-get={(nest.as_str())"/search"} hx-target="#members-search-results" hx-push-url="true" {
                     label ."input"."input-bordered"."flex"."items-center"."gap-2" {
                         input type="text" name="search" placeholder="Search" value=[&params.search] ."grow"."bg-inherit";
                         span ."text-secondary" {(icons::search())}
@@ -101,7 +102,14 @@ pub async fn members_list(
         }
         ."divider" {}
         #"members-search-results" hx-get={(nest.as_str())"/search"} hx-trigger="load" hx-vals=(serde_json::to_string(&params).unwrap())  {}
-    }}
+    }
+
+    #"action_buttons" hx-swap-oob="innerHTML" {
+        button ."btn"."btn-circle"."btn-outline"."btn-accent"
+            onclick="openModal()" hx-get={(nest.as_str())"/create"} hx-target="#modal-content"
+            {(icons::plus())}
+    }
+    }
 }
 
 pub async fn search_results(

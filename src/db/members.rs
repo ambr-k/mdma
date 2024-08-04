@@ -117,7 +117,9 @@ impl MembersQueryFilter for sea_query::SelectStatement {
                 q.and_where(if params.member_status.unwrap() {
                     active_expr
                 } else {
-                    active_expr.not()
+                    active_expr
+                        .not()
+                        .or(Expr::col(Members::ConsecutiveUntilCached).is_null())
                 });
             },
             |_| {},
