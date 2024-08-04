@@ -312,3 +312,40 @@ pub async fn create_commands(
         .await
         .expect("user:whois");
 }
+
+#[derive(serde::Serialize)]
+struct InviteOptions {
+    max_age: u64,
+    max_uses: u8,
+    unique: bool,
+}
+
+impl Default for InviteOptions {
+    fn default() -> Self {
+        Self {
+            max_age: 604800,
+            max_uses: 1,
+            unique: true,
+        }
+    }
+}
+
+pub async fn create_invite(
+    reason: Option<&str>,
+    state: &crate::AppState,
+) -> Result<String, serenity::Error> {
+    Ok(state
+        .discord_http
+        .create_invite(
+            state
+                .secret_store
+                .get("DISCORD_INVITE_CHANNEL_ID")
+                .unwrap()
+                .parse::<ChannelId>()
+                .unwrap(),
+            &InviteOptions::default(),
+            reason,
+        )
+        .await?
+        .url())
+}

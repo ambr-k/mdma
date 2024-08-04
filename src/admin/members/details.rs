@@ -2,12 +2,19 @@ use axum::{
     extract::{NestedPath, Path, State},
     response::{IntoResponse, Response},
 };
-use maud::{html, Markup};
+use lettre::AsyncTransport;
+use maud::{html, Markup, PreEscaped};
 use reqwest::StatusCode;
 use rust_decimal::prelude::ToPrimitive;
 use serde::Deserialize;
+use serenity::futures::TryFutureExt;
 
-use crate::{db::members::MemberRow, icons};
+use crate::{
+    db::members::MemberRow,
+    discord::create_invite,
+    icons,
+    send_email::{build_mailer, build_message, EmailValues},
+};
 
 pub enum DiscordMembership {
     GuildMember(serenity::model::guild::Member),
@@ -147,5 +154,47 @@ pub async fn details(
         ."divider" {"Actions"}
         button ."btn"."btn-secondary"."btn-outline" onclick="openModal()" hx-get={(nest.as_str())"/new_payment/"(member.id)} hx-target="#modal-content" {"Add Payment"}
         a href={"/admin/payments?member_search="(member.id)} ."btn"."btn-secondary"."btn-outline"."mx-2" {"View Payments"}
+        button ."btn"."btn-secondary"."btn-outline" hx-post={(nest.as_str())"/send_discord_email/"(member.id)} hx-swap="none" {(icons::discord())" Send Discord Invite"}
+    })
+}
+
+pub async fn send_discord_email(
+    State(state): State<crate::AppState>,
+    Path(member_id): Path<i32>,
+) -> Result<Markup, Markup> {
+    let email = sqlx::query_scalar!(r#"SELECT first_name||' '||last_name||' <'||email||'>' AS "id!" FROM members WHERE id=$1"#, member_id)
+        .fetch_one(&state.db_pool)
+        .await
+        .map_err(|err| html! { ."alert"."alert-error" role="alert" { (icons::error()) span {(err.to_string())} } })?;
+    let first_name = sqlx::query_scalar!(r#"SELECT first_name FROM members WHERE id=$1"#, member_id)
+    .fetch_one(&state.db_pool)
+    .await
+    .map_err(|err| html! { ."alert"."alert-error" role="alert" { (icons::error()) span {(err.to_string())} } })?;
+
+    let mailer = build_mailer(&state).map_err(|err| html! { ."alert"."alert-error" role="alert" {(icons::error())} span {(err.to_string())}}).await?;
+    let invite_url = create_invite(Some(&format!("Manual send to {} from MDMA Web UI", email)), &state)
+        .await
+        .map_err(|err| html! { ."alert"."alert-error" role="alert" { (icons::error()) span {(err.to_string())} } })?;
+    let message = build_message("discord", "Psychedelic Club Discord", &email, &EmailValues {
+            first_name,
+            invite_url,
+        }, &state)
+        .map_err(|err| html! { ."alert"."alert-error" role="alert" { (icons::error()) span {(err.to_string())} } })?;
+
+    mailer.send(message).await.map_err(|err| html! { ."alert"."alert-error" role="alert" { (icons::error()) span {(err.to_string())} } })?;
+    Ok(html! {
+        div hx-swap-oob="afterbegin:#alerts" {
+            #{"alert_discord_send_success_"(member_id)}."alert"."alert-success"."transition-opacity"."duration-300" role="alert" {
+                (icons::success())
+                span {"Discord Invite Sent Successfully"}
+                script {(PreEscaped(format!("
+                    setTimeout(() => {{
+                        const toastElem = $('#alert_discord_send_success_{}');
+                        toastElem.on('transitionend', (event) => {{event.target.remove();}});
+                        toastElem.css('opacity', 0);
+                    }}, 2500);
+                ", member_id)))}
+            }
+        }
     })
 }

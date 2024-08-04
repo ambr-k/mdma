@@ -1,4 +1,7 @@
-use axum::{routing::get, Router};
+use axum::{
+    routing::{get, post},
+    Router,
+};
 
 mod create_member;
 mod details;
@@ -10,6 +13,10 @@ pub fn router(state: crate::AppState) -> Router {
         .route("/", get(search::members_list))
         .route("/search", get(search::search_results))
         .route("/details/:member_id", get(details::details))
+        .route(
+            "/send_discord_email/:member_id",
+            post(details::send_discord_email),
+        )
         .route(
             "/new_payment/:member_id",
             get(new_payment::payment_form).post(new_payment::add_payment),
