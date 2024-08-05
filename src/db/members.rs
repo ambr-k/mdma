@@ -2,8 +2,8 @@ use std::str::FromStr;
 
 use rust_decimal::Decimal;
 use sea_query::{
-    extension::postgres::PgExpr, Alias, Asterisk, Expr, Iden, Order, PostgresQueryBuilder, Query,
-    SimpleExpr,
+    extension::postgres::PgExpr, Asterisk, Expr, Iden, IntoColumnRef, Order, PostgresQueryBuilder,
+    Query, SimpleExpr,
 };
 use sea_query_binder::SqlxBinder;
 use serde::{Deserialize, Deserializer, Serialize};
@@ -65,6 +65,24 @@ pub struct MembersQuery {
 
 #[allow(dead_code)]
 #[derive(FromRow)]
+pub struct MemberDetailsRow {
+    pub id: i32,
+    pub email: String,
+    pub first_name: String,
+    pub last_name: String,
+    pub reason_removed: Option<String>,
+    pub created_on: Date,
+    pub discord: Option<Decimal>,
+    pub first_payment: Option<Date>,
+    pub consecutive_since: Option<Date>,
+    pub consecutive_until: Option<Date>,
+    pub generation_name: Option<String>,
+    pub generation_id: Option<i32>,
+    pub is_active: Option<bool>,
+}
+
+#[allow(dead_code)]
+#[derive(FromRow)]
 pub struct MemberRow {
     pub id: i32,
     pub email: String,
@@ -72,13 +90,11 @@ pub struct MemberRow {
     pub last_name: String,
     pub reason_removed: Option<String>,
     pub created_on: Date,
-    pub consecutive_since_cached: Option<Date>,
-    pub consecutive_until_cached: Option<Date>,
-    pub generation_name: Option<String>,
     pub discord: Option<Decimal>,
 }
 
 trait MembersQueryFilter {
+    fn from_member_details(&mut self) -> &mut Self;
     fn members_query_filter(&mut self, params: &MembersQuery) -> &mut Self;
     async fn members_discord_filter(
         &mut self,
@@ -89,6 +105,14 @@ trait MembersQueryFilter {
 }
 
 impl MembersQueryFilter for sea_query::SelectStatement {
+    fn from_member_details(&mut self) -> &mut Self {
+        self.from(Members::Table).left_join(
+            MemberDetails::Table,
+            Expr::col((Members::Table, Members::Id))
+                .equals((MemberDetails::Table, MemberDetails::Id)),
+        )
+    }
+
     fn members_query_filter(&mut self, params: &MembersQuery) -> &mut Self {
         self.conditions(
             !params
@@ -111,16 +135,7 @@ impl MembersQueryFilter for sea_query::SelectStatement {
         .conditions(
             params.member_status.is_some(),
             |q| {
-                let active_expr = Expr::col(Members::ConsecutiveUntilCached)
-                    .gt(Expr::current_date())
-                    .and(Expr::col(Members::ReasonRemoved).is_null());
-                q.and_where(if params.member_status.unwrap() {
-                    active_expr
-                } else {
-                    active_expr
-                        .not()
-                        .or(Expr::col(Members::ConsecutiveUntilCached).is_null())
-                });
+                q.and_where(Expr::col(MemberDetails::IsActive).eq(params.member_status.unwrap()));
             },
             |_| {},
         )
@@ -139,8 +154,7 @@ impl MembersQueryFilter for sea_query::SelectStatement {
             params.generation_id >= 0,
             |q| {
                 q.and_where(
-                    Expr::col(MemberGenerations::GenerationId)
-                        .eq(Expr::value(params.generation_id)),
+                    Expr::col(MemberDetails::GenerationId).eq(Expr::value(params.generation_id)),
                 );
             },
             |_| {},
@@ -192,38 +206,31 @@ pub async fn search(
     };
 
     let (query, values) = Query::select()
-        .column((Members::Table, Asterisk))
-        .expr_as(Expr::col(Generations::Title), Alias::new("generation_name"))
-        .from(Members::Table)
-        .left_join(
-            MemberGenerations::Table,
-            Expr::col((Members::Table, Members::Id)).equals(MemberGenerations::MemberId),
-        )
-        .left_join(
-            Generations::Table,
-            Expr::col((Generations::Table, Generations::Id))
-                .equals(MemberGenerations::GenerationId),
-        )
+        .column(Asterisk)
+        .from_member_details()
         .members_query_filter(params)
+        .members_discord_filter(&params.discord, &state.discord_http, &state.discord_guild)
+        .await
         .limit(params.count)
         .offset(params.offset)
         .order_by_columns(match params.sort_by.as_str() {
             "firstname" => vec![
-                ((Members::Table, Members::FirstName), sort_order.clone()),
-                ((Members::Table, Members::LastName), sort_order.clone()),
+                (Members::FirstName.into_column_ref(), sort_order.clone()),
+                (Members::LastName.into_column_ref(), sort_order.clone()),
             ],
             "lastname" => vec![
-                ((Members::Table, Members::LastName), sort_order.clone()),
-                ((Members::Table, Members::FirstName), sort_order.clone()),
+                (Members::LastName.into_column_ref(), sort_order.clone()),
+                (Members::FirstName.into_column_ref(), sort_order.clone()),
             ],
             "consecutivesince" => vec![(
-                (Members::Table, Members::ConsecutiveSinceCached),
+                MemberDetails::ConsecutiveSince.into_column_ref(),
                 sort_order.clone(),
             )],
-            _ => vec![((Members::Table, Members::Id), sort_order.clone())],
+            _ => vec![(
+                (Members::Table, Members::Id).into_column_ref(),
+                sort_order.clone(),
+            )],
         })
-        .members_discord_filter(&params.discord, &state.discord_http, &state.discord_guild)
-        .await
         .build_sqlx(PostgresQueryBuilder);
 
     sqlx::query_as_with::<_, MemberRow, _>(&query, values)
@@ -234,11 +241,7 @@ pub async fn search(
 pub async fn count(params: &MembersQuery, state: &crate::AppState) -> Result<u64, sqlx::Error> {
     let (query, values) = Query::select()
         .expr(Expr::col(Asterisk).count())
-        .from(Members::Table)
-        .left_join(
-            MemberGenerations::Table,
-            Expr::col((Members::Table, Members::Id)).equals(MemberGenerations::MemberId),
-        )
+        .from_member_details()
         .members_query_filter(params)
         .members_discord_filter(&params.discord, &state.discord_http, &state.discord_guild)
         .await
@@ -260,22 +263,17 @@ pub enum Members {
     LastName,
     ReasonRemoved,
     CreatedOn,
-    ConsecutiveSinceCached,
-    ConsecutiveUntilCached,
-    GenerationName,
     Discord,
 }
 
 #[derive(Iden)]
-enum Generations {
+enum MemberDetails {
     Table,
     Id,
-    Title,
-}
-
-#[derive(Iden)]
-enum MemberGenerations {
-    Table,
-    MemberId,
     GenerationId,
+    GenerationName,
+    ConsecutiveSince,
+    ConsecutiveUntil,
+    IsActive,
+    FirstPayment,
 }

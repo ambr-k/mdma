@@ -18,9 +18,7 @@ pub async fn payment_form(
 ) -> Result<Markup, Response> {
     let member = sqlx::query_as!(
         MemberRow,
-        r#" SELECT members.*, NULL AS "generation_name?"
-            FROM members
-            WHERE members.id=$1"#,
+        "SELECT members.* FROM members WHERE members.id=$1",
         member_id
     )
     .fetch_one(&state.db_pool)

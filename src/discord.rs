@@ -9,20 +9,9 @@ use axum::{
 use reqwest::header;
 use rust_decimal::Decimal;
 use serenity::{builder::*, model::prelude::*};
-use time::{macros::date, Date};
+use time::macros::date;
 
-#[allow(dead_code)]
-struct DbMember {
-    id: i32,
-    email: String,
-    first_name: String,
-    last_name: String,
-    reason_removed: Option<String>,
-    created_on: Date,
-    consecutive_since_cached: Option<Date>,
-    consecutive_until_cached: Option<Date>,
-    discord: Option<Decimal>,
-}
+use crate::db::members::MemberDetailsRow;
 
 async fn whois(
     user_id: UserId,
@@ -30,8 +19,8 @@ async fn whois(
     db_pool: &sqlx::PgPool,
 ) -> Result<CreateInteractionResponse, StatusCode> {
     let result = sqlx::query_as!(
-        DbMember,
-        "SELECT * FROM members WHERE discord=$1",
+        MemberDetailsRow,
+        "SELECT * FROM members NATURAL JOIN member_details WHERE discord=$1",
         Decimal::from(user_id.get())
     )
     .fetch_all(db_pool)
@@ -66,12 +55,18 @@ async fn whois(
                                 .field("email", member.email.clone(), false)
                                 .field("created_on", format!("{}", member.created_on), false)
                                 .field(
+                                    "first_payment",
+                                    format!(
+                                        "{}",
+                                        member.first_payment.unwrap_or(date!(1970 - 01 - 01))
+                                    ),
+                                    false,
+                                )
+                                .field(
                                     "consecutive_since",
                                     format!(
                                         "{}",
-                                        member
-                                            .consecutive_since_cached
-                                            .unwrap_or(date!(1970 - 01 - 01))
+                                        member.consecutive_since.unwrap_or(date!(1970 - 01 - 01))
                                     ),
                                     true,
                                 )
@@ -79,11 +74,19 @@ async fn whois(
                                     "consecutive_until",
                                     format!(
                                         "{}",
-                                        member
-                                            .consecutive_until_cached
-                                            .unwrap_or(date!(1970 - 01 - 01))
+                                        member.consecutive_until.unwrap_or(date!(1970 - 01 - 01))
                                     ),
                                     true,
+                                )
+                                .field(
+                                    "generation_name",
+                                    member.generation_name.as_deref().unwrap_or("null"),
+                                    false,
+                                )
+                                .field(
+                                    "is_active",
+                                    member.is_active.unwrap_or(false).to_string(),
+                                    false,
                                 )
                         })
                         .collect(),

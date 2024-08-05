@@ -32,8 +32,8 @@ pub async fn generations_list(State(state): State<crate::AppState>) -> Markup {
         FROM 
             (SELECT generation_id AS id,
                     COUNT(*) AS total_members,
-                    COUNT(*) FILTER (WHERE consecutive_until_cached >= NOW()) AS active_members,
-                    ARRAY_AGG(CONCAT(first_name, ' ', last_name, ' <', email, '>')) FILTER (WHERE consecutive_until_cached >= NOW()) AS active_emails
+                    COUNT(*) FILTER (WHERE is_active(id)) AS active_members,
+                    ARRAY_AGG(CONCAT(first_name, ' ', last_name, ' <', email, '>')) FILTER (WHERE is_active(id)) AS active_emails
             FROM member_generations
                 INNER JOIN members ON members.id = member_id
             GROUP BY generation_id) temp1

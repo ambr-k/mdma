@@ -7,10 +7,9 @@ use maud::{html, Markup, PreEscaped};
 use reqwest::StatusCode;
 use rust_decimal::prelude::ToPrimitive;
 use serde::Deserialize;
-use serenity::futures::TryFutureExt;
 
 use crate::{
-    db::members::MemberRow,
+    db::members::MemberDetailsRow,
     discord::create_invite,
     err_responses::{ErrorResponse, MapErrorResponse},
     icons,
@@ -40,12 +39,8 @@ pub async fn details(
     State(state): State<crate::AppState>,
 ) -> Result<Markup, Response> {
     let member = sqlx::query_as!(
-        MemberRow,
-        r#" SELECT members.*, generations.title AS "generation_name?"
-            FROM members
-                LEFT JOIN member_generations ON members.id = member_id
-                LEFT JOIN generations ON generations.id = generation_id
-            WHERE members.id=$1"#,
+        MemberDetailsRow,
+        "SELECT * FROM members NATURAL JOIN member_details WHERE id=$1",
         member_id
     )
     .fetch_one(&state.db_pool)
@@ -113,13 +108,13 @@ pub async fn details(
     Ok(html! {
         ."divider" {"Member Details"}
         a ."btn"."btn-link" href={"mailto:"(member.email)} {(member.email)}
-        @if let Some(val) = member.consecutive_since_cached {
+        @if let Some(val) = member.consecutive_since {
             p {"Active since "(val)" ("(member.generation_name.as_deref().unwrap_or("Generation N/A"))")"}
         }
-        @if let Some(val) = member.consecutive_until_cached {
+        @if let Some(val) = member.consecutive_until {
             p {"Active until "(val)}
         }
-        @if member.consecutive_until_cached.is_none() { p {"No recorded payments"} }
+        @if member.consecutive_until.is_none() { p {"No recorded payments"} }
         ."divider" {"Third-Party Accounts"}
         @for wc_account in webconnex {
             a ."btn"."btn-outline"."btn-primary" href={"https://manage.webconnex.com/contacts/"(wc_account.id)} target="_blank" {"GivingFuel ID "(wc_account.id)}
