@@ -161,7 +161,7 @@ pub async fn search_results(
     Ok(html! {
         @for member in &members {
             ."collapse"."collapse-arrow"."bg-base-200"."my-2" {
-                input #{"user_details_trigger_"(member.id)} type="radio" name="members-list-accordion"
+                input #{"user_details_trigger_"(member.id)} type="radio" name="members-list-accordion" checked[members.len() == 1] hx-trigger=(if members.len() == 1 {"load, change"} else {"change"})
                     hx-get={(nest.as_str())"/details/"(member.id)} hx-target="next .collapse-content" hx-indicator="closest .collapse";
                 ."collapse-title"."text-xl"."font-medium" {(member.last_name)", "(member.first_name)}
                 #{"user_details_"(member.id)} ."collapse-content" { progress ."progress"."htmx-indicator" {} }
