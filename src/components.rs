@@ -1,4 +1,7 @@
-use maud::{html, Markup, PreEscaped, DOCTYPE};
+use axum::response::IntoResponse;
+use maud::{html, Markup, PreEscaped, Render, DOCTYPE};
+
+use crate::icons;
 
 pub fn layout(navbar_options: Markup, main_content: Option<Markup>) -> Markup {
     html! {
@@ -32,5 +35,42 @@ pub fn layout(navbar_options: Markup, main_content: Option<Markup>) -> Markup {
                 script src="https://code.jquery.com/jquery-3.7.1.slim.min.js" {}
             }
         }
+    }
+}
+
+pub enum ToastAlert<'a> {
+    Success(&'a str),
+    Error(&'a str),
+}
+
+impl Render for ToastAlert<'_> {
+    fn render(&self) -> Markup {
+        let toastid = sqlx::types::Uuid::new_v4().simple();
+        let classname = match self {
+            Self::Success(_) => "alert-success",
+            Self::Error(_) => "alert-error",
+        };
+
+        html! {div hx-swap-oob="afterbegin:#alerts" {
+            #{"toast_"(toastid)}."alert"."transition-opacity"."duration-300".(classname) role="alert" {
+                @match self {
+                    Self::Success(text) => (icons::success()) span {(text)},
+                    Self::Error(text) => (icons::error()) span {(text)},
+                }
+                script {(PreEscaped(format!("
+                    setTimeout(() => {{
+                        const toastElem = $('#toast_{}');
+                        toastElem.on('transitionend', (event) => {{event.target.remove();}});
+                        toastElem.css('opacity', 0);
+                    }}, 2500);
+                ", toastid)))}
+            }
+        }}
+    }
+}
+
+impl IntoResponse for ToastAlert<'_> {
+    fn into_response(self) -> axum::response::Response {
+        self.render().into_response()
     }
 }

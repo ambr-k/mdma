@@ -8,6 +8,8 @@ use axum::{
 use hmac::{Hmac, Mac};
 use sha2::Sha256;
 
+use crate::err_responses::{ErrorResponse, MapErrorResponse};
+
 #[derive(Clone)]
 pub struct VerifySigState {
     pub hmac_secret: String,
@@ -21,11 +23,11 @@ pub async fn ver_sig(
     let (parts, body) = req.into_parts();
 
     let mut hmac = Hmac::<Sha256>::new_from_slice(state.hmac_secret.as_bytes())
-        .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()).into_response())?;
+        .map_err_response(ErrorResponse::InternalServerError)?;
 
     let body_bytes = axum::body::to_bytes(body, usize::MAX)
         .await
-        .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()).into_response())?;
+        .map_err_response(ErrorResponse::InternalServerError)?;
 
     hmac.update(body_bytes.as_ref());
 
@@ -42,7 +44,7 @@ pub async fn ver_sig(
         .as_bytes();
 
     hmac.verify_slice(hex::decode(signature).unwrap().as_slice())
-        .map_err(|err| (StatusCode::UNAUTHORIZED, err.to_string()).into_response())?;
+        .map_err_response(ErrorResponse::StatusCode(StatusCode::UNAUTHORIZED))?;
 
     Ok(next
         .run(Request::from_parts(parts, Body::from(body_bytes)))

@@ -3,6 +3,8 @@ use axum::{
     response::{IntoResponse, Response},
 };
 
+use crate::err_responses::{ErrorResponse, MapErrorResponse};
+
 use super::request_payload;
 
 #[derive(serde::Serialize)]
@@ -29,5 +31,5 @@ pub async fn insert_transaction(
     )
     .fetch_one(&state.db_pool)
     .await
-    .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()).into_response())
+    .map_err_response(ErrorResponse::InternalServerError)
 }

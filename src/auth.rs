@@ -13,7 +13,10 @@ use oauth2::{
 use serde::{Deserialize, Serialize};
 use time::Duration;
 
-use crate::AppState;
+use crate::{
+    err_responses::{ErrorResponse, MapErrorResponse},
+    AppState,
+};
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct AccountRecord {
@@ -75,19 +78,19 @@ pub async fn oauth_callback(
         .exchange_code(AuthorizationCode::new(params.code))
         .request_async(oauth2::reqwest::async_http_client)
         .await
-        .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()).into_response())?;
+        .map_err_response(ErrorResponse::InternalServerError)?;
 
     let profile_resp = http_client
         .get("https://openidconnect.googleapis.com/v1/userinfo")
         .bearer_auth(token.access_token().secret().to_owned())
         .send()
         .await
-        .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()).into_response())?;
+        .map_err_response(ErrorResponse::InternalServerError)?;
 
     let profile = profile_resp
         .json::<GoogleUserProfile>()
         .await
-        .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()).into_response())?;
+        .map_err_response(ErrorResponse::InternalServerError)?;
 
     sqlx::query!(
         "INSERT INTO accounts (email) VALUES ($1) ON CONFLICT DO NOTHING",
@@ -95,7 +98,7 @@ pub async fn oauth_callback(
     )
     .execute(&db_pool)
     .await
-    .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()).into_response())?;
+    .map_err_response(ErrorResponse::InternalServerError)?;
 
     let account = sqlx::query_as!(
         AccountRecord,
@@ -104,7 +107,7 @@ pub async fn oauth_callback(
     )
     .fetch_one(&db_pool)
     .await
-    .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()).into_response())?;
+    .map_err_response(ErrorResponse::InternalServerError)?;
 
     let jwt = jsonwebtoken::encode(
         &jsonwebtoken::Header::default(),
@@ -117,7 +120,7 @@ pub async fn oauth_callback(
             secret_store.get("SESSION_JWT_SECRET").unwrap().as_bytes(),
         ),
     )
-    .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()).into_response())?;
+    .map_err_response(ErrorResponse::InternalServerError)?;
 
     Ok((cookies.add(Cookie::new("jwt", jwt)), Redirect::to("/admin")))
 }

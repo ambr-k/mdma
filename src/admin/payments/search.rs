@@ -7,7 +7,7 @@ use maud::{html, Markup};
 use reqwest::StatusCode;
 use tokio::try_join;
 
-use crate::{db::payments::PaymentsQuery, icons};
+use crate::{db::payments::PaymentsQuery, err_responses::{ErrorResponse, MapErrorResponse}, icons};
 
 pub async fn search_form(nest: NestedPath, Query(params): Query<PaymentsQuery>) -> Markup {
     html! { #"payments_list" ."w-full"."max-w-4xl"."mx-auto" {
@@ -63,7 +63,7 @@ pub async fn search_results(
         crate::db::payments::search(&params, &state),
         crate::db::payments::count(&params, &state)
     )
-    .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()).into_response())?;
+    .map_err_response(ErrorResponse::InternalServerError)?;
 
     let pagebtn = |request_opt: Option<PaginationRequest>, text: &str| -> Markup {
         html! {

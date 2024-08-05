@@ -16,6 +16,7 @@ mod auth;
 mod components;
 mod db;
 mod discord;
+mod err_responses;
 mod icons;
 mod send_email;
 mod webconnex;

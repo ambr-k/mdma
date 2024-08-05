@@ -12,6 +12,7 @@ use serenity::futures::TryFutureExt;
 use crate::{
     db::members::MemberRow,
     discord::create_invite,
+    err_responses::{ErrorResponse, MapErrorResponse},
     icons,
     send_email::{build_mailer, build_message, EmailValues},
 };
@@ -66,10 +67,10 @@ pub async fn details(
         )
         .send()
         .await
-        .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()).into_response())?
+        .map_err_response(ErrorResponse::InternalServerError)?
         .json::<WebconnexCustomerSearchResponse>()
         .await
-        .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()).into_response())?
+        .map_err_response(ErrorResponse::InternalServerError)?
         .data
         .unwrap_or_default();
 
@@ -161,27 +162,45 @@ pub async fn details(
 pub async fn send_discord_email(
     State(state): State<crate::AppState>,
     Path(member_id): Path<i32>,
-) -> Result<Markup, Markup> {
-    let email = sqlx::query_scalar!(r#"SELECT first_name||' '||last_name||' <'||email||'>' AS "id!" FROM members WHERE id=$1"#, member_id)
-        .fetch_one(&state.db_pool)
-        .await
-        .map_err(|err| html! { ."alert"."alert-error" role="alert" { (icons::error()) span {(err.to_string())} } })?;
-    let first_name = sqlx::query_scalar!(r#"SELECT first_name FROM members WHERE id=$1"#, member_id)
+) -> Result<Markup, Response> {
+    let email = sqlx::query_scalar!(
+        r#"SELECT first_name||' '||last_name||' <'||email||'>' AS "id!" FROM members WHERE id=$1"#,
+        member_id
+    )
     .fetch_one(&state.db_pool)
     .await
-    .map_err(|err| html! { ."alert"."alert-error" role="alert" { (icons::error()) span {(err.to_string())} } })?;
+    .map_err_response(ErrorResponse::Toast)?;
+    let first_name =
+        sqlx::query_scalar!(r#"SELECT first_name FROM members WHERE id=$1"#, member_id)
+            .fetch_one(&state.db_pool)
+            .await
+            .map_err_response(ErrorResponse::Toast)?;
 
-    let mailer = build_mailer(&state).map_err(|err| html! { ."alert"."alert-error" role="alert" {(icons::error())} span {(err.to_string())}}).await?;
-    let invite_url = create_invite(Some(&format!("Manual send to {} from MDMA Web UI", email)), &state)
+    let mailer = build_mailer(&state)
         .await
-        .map_err(|err| html! { ."alert"."alert-error" role="alert" { (icons::error()) span {(err.to_string())} } })?;
-    let message = build_message("discord", "Psychedelic Club Discord", &email, &EmailValues {
+        .map_err_response(ErrorResponse::Toast)?;
+    let invite_url = create_invite(
+        Some(&format!("Manual send to {} from MDMA Web UI", email)),
+        &state,
+    )
+    .await
+    .map_err_response(ErrorResponse::Toast)?;
+    let message = build_message(
+        "discord",
+        "Psychedelic Club Discord",
+        &email,
+        &EmailValues {
             first_name,
             invite_url,
-        }, &state)
-        .map_err(|err| html! { ."alert"."alert-error" role="alert" { (icons::error()) span {(err.to_string())} } })?;
+        },
+        &state,
+    )
+    .map_err_response(ErrorResponse::Toast)?;
 
-    mailer.send(message).await.map_err(|err| html! { ."alert"."alert-error" role="alert" { (icons::error()) span {(err.to_string())} } })?;
+    mailer
+        .send(message)
+        .await
+        .map_err_response(ErrorResponse::Toast)?;
     Ok(html! {
         div hx-swap-oob="afterbegin:#alerts" {
             #{"alert_discord_send_success_"(member_id)}."alert"."alert-success"."transition-opacity"."duration-300" role="alert" {

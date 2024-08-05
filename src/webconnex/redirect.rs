@@ -7,6 +7,8 @@ use axum::{
 use reqwest::StatusCode;
 use serde::Deserialize;
 
+use crate::err_responses::{ErrorResponse, MapErrorResponse};
+
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct WebconnexTransactionData {
@@ -34,10 +36,10 @@ pub async fn transaction(
         )
         .send()
         .await
-        .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()).into_response())?
+        .map_err_response(ErrorResponse::InternalServerError)?
         .json::<WebconnexTransactionResponse>()
         .await
-        .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()).into_response())?
+        .map_err_response(ErrorResponse::InternalServerError)?
         .data;
 
     Ok(Redirect::permanent(&format!(

@@ -1,6 +1,9 @@
 use std::collections::HashSet;
 
-use crate::icons;
+use crate::{
+    err_responses::{ErrorResponse, MapErrorResponse},
+    icons,
+};
 use axum::{
     extract::{Multipart, NestedPath, State},
     http::StatusCode,
@@ -152,7 +155,7 @@ pub async fn submit_givingfuel_bulk_update(
     {
         let row = result
             .as_ref()
-            .map_err(|err| (StatusCode::BAD_REQUEST, err.to_string()).into_response())?;
+            .map_err_response(ErrorResponse::StatusCode(StatusCode::BAD_REQUEST))?;
 
         if row.status != "completed" || row.transaction_type != "charge" || row.total.is_none() {
             continue;
@@ -168,7 +171,7 @@ pub async fn submit_givingfuel_bulk_update(
             )
             .execute(&mut *transaction)
             .await
-            .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()).into_response())?;
+            .map_err_response(ErrorResponse::InternalServerError)?;
 
             emails.insert(row.email.clone());
             members_added += 1;
@@ -187,7 +190,7 @@ pub async fn submit_givingfuel_bulk_update(
         )
         .execute(&mut *transaction)
         .await
-        .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()).into_response())?;
+        .map_err_response(ErrorResponse::InternalServerError)?;
 
         payments_added += 1;
     }
@@ -195,7 +198,7 @@ pub async fn submit_givingfuel_bulk_update(
     transaction
         .commit()
         .await
-        .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()).into_response())?;
+        .map_err_response(ErrorResponse::InternalServerError)?;
 
     Ok((
         StatusCode::OK,

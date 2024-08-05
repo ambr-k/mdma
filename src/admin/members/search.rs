@@ -7,7 +7,11 @@ use maud::{html, Markup};
 use reqwest::StatusCode;
 use tokio::try_join;
 
-use crate::{db::members::MembersQuery, icons};
+use crate::{
+    db::members::MembersQuery,
+    err_responses::{ErrorResponse, MapErrorResponse},
+    icons,
+};
 
 struct SelectIdOption {
     id: i32,
@@ -126,7 +130,7 @@ pub async fn search_results(
         crate::db::members::search(&params, &state),
         crate::db::members::count(&params, &state)
     )
-    .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()).into_response())?;
+    .map_err_response(ErrorResponse::Toast)?;
 
     let pagebtn = |request_opt: Option<PaginationRequest>, text: &str| -> Markup {
         html! {

@@ -9,6 +9,7 @@ use reqwest::StatusCode;
 use serde::Deserialize;
 
 use crate::{
+    err_responses::{ErrorResponse, MapErrorResponse},
     icons,
     send_email::{build_mailer, build_message, sanitize_email, EmailValues},
 };
@@ -117,7 +118,7 @@ pub async fn send_email(
 ) -> Result<Response, Response> {
     let mailer = build_mailer(&state)
         .await
-        .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err).into_response())?;
+        .map_err_response(ErrorResponse::InternalServerError)?;
     let values = EmailValues {
         first_name: params.first_name,
         invite_url: params.invite_url,
@@ -129,7 +130,7 @@ pub async fn send_email(
         &values,
         &state,
     )
-    .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err).into_response())?;
+    .map_err_response(ErrorResponse::InternalServerError)?;
     mailer
         .send(message)
         .await
@@ -144,5 +145,5 @@ pub async fn send_email(
             )
                 .into_response()
         })
-        .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()).into_response())
+        .map_err_response(ErrorResponse::InternalServerError)
 }

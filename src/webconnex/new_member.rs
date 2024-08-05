@@ -9,6 +9,7 @@ use serenity::all::ChannelId;
 
 use crate::{
     discord::create_invite,
+    err_responses::{ErrorResponse, MapErrorResponse},
     send_email::{build_mailer, build_message, EmailValues},
 };
 
@@ -27,11 +28,11 @@ async fn send_emails(state: &crate::AppState, event: &EventDetails) -> Result<()
         state,
     )
     .await
-    .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()).into_response())?;
+    .map_err_response(ErrorResponse::InternalServerError)?;
 
     let mailer = build_mailer(state)
         .await
-        .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()).into_response())?;
+        .map_err_response(ErrorResponse::InternalServerError)?;
     let values = EmailValues {
         first_name: event.billing.name.first.clone(),
         invite_url,
@@ -46,10 +47,10 @@ async fn send_emails(state: &crate::AppState, event: &EventDetails) -> Result<()
                 &values,
                 state,
             )
-            .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err).into_response())?,
+            .map_err_response(ErrorResponse::InternalServerError)?,
         )
         .await
-        .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()).into_response())?;
+        .map_err_response(ErrorResponse::InternalServerError)?;
     Ok(())
 }
 
