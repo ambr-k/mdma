@@ -4,10 +4,11 @@ use reqwest::StatusCode;
 
 use crate::{components, icons};
 
-pub enum ErrorResponse {
+pub enum ErrorResponse<'a> {
     InternalServerError,
     StatusCode(StatusCode),
     Alert,
+    AlertWithPrelude(&'a str),
     Toast,
 }
 
@@ -17,14 +18,11 @@ pub trait MapErrorResponse<T> {
 
 impl<T, E: ToString> MapErrorResponse<T> for Result<T, E> {
     fn map_err_response(self, mapper: ErrorResponse) -> Result<T, Response> {
-        match self {
-            Ok(val) => Ok(val),
-            Err(err) => Err(mapper.transform(err)),
-        }
+        self.map_err(|err| mapper.transform(err))
     }
 }
 
-impl ErrorResponse {
+impl ErrorResponse<'_> {
     pub fn transform<E: ToString>(&self, err: E) -> Response {
         match self {
             Self::InternalServerError => {
@@ -33,6 +31,10 @@ impl ErrorResponse {
             Self::StatusCode(code) => (*code, err.to_string()).into_response(),
             Self::Alert => {
                 html! { ."alert"."alert-error" {(icons::error()) span {(err.to_string())}} }
+                    .into_response()
+            }
+            Self::AlertWithPrelude(prelude) => {
+                html! { ."alert"."alert-error" {(icons::error()) span {(prelude)": "(err.to_string())}} }
                     .into_response()
             }
             Self::Toast => components::ToastAlert::Error(&err.to_string()).into_response(),

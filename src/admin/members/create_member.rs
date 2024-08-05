@@ -2,12 +2,13 @@ use std::str::FromStr;
 
 use axum::{
     extract::{NestedPath, State},
+    response::{IntoResponse, Response},
     Form,
 };
-use maud::{html, Markup, PreEscaped};
+use maud::{html, Markup};
 use serde::Deserialize;
 
-use crate::icons;
+use crate::{components, err_responses::MapErrorResponse, icons};
 
 pub async fn member_form(nest: NestedPath) -> Markup {
     html! {
@@ -49,51 +50,26 @@ pub async fn add_member(
     nest: NestedPath,
     State(state): State<crate::AppState>,
     Form(form): Form<CreateMemberFormData>,
-) -> Markup {
-    if let Err(err) = lettre::Address::from_str(&form.email) {
-        return html! { ."alert"."alert-error" role="alert" {
-            (icons::error())
-            span {"Invalid Email: "(err.to_string())}
-        } };
-    }
+) -> Result<Markup, Response> {
+    lettre::Address::from_str(&form.email).map_err_response(
+        crate::err_responses::ErrorResponse::AlertWithPrelude("Invalid Email"),
+    )?;
 
-    match sqlx::query_scalar!(
+    sqlx::query!(
         r#"INSERT INTO members  (first_name,    last_name,  email)
-            VALUES              ($1,            $2,         $3)
-            RETURNING id"#,
+            VALUES              ($1,            $2,         $3)"#,
         form.first_name,
         form.last_name,
         form.email.to_lowercase()
     )
-    .fetch_one(&state.db_pool)
+    .execute(&state.db_pool)
     .await
-    {
-        Ok(user_id) => html! {
-            {
-                #"reload-list" hx-get={(nest.as_str())} hx-vals=(format!(r#"{{"search": "{}"}}"#, form.email)) hx-target="#members-list" hx-trigger="load" hx-swap="outerHTML" { progress ."progress"."mt-6" {} }
-                script { "$('#modal')[0].close();" }
-            }
+    .map_err_response(crate::err_responses::ErrorResponse::Alert)?;
 
-            div hx-swap-oob="afterbegin:#alerts" {
-                #{"alert_newmember_success_"(user_id)}."alert"."alert-success"."transition-opacity"."duration-300" role="alert" {
-                    (icons::success())
-                    span {"Member Added Successfully"}
-                    script {(PreEscaped(format!("
-                        setTimeout(() => {{
-                            const toastElem = $('#alert_newmember_success_{}');
-                            toastElem.on('transitionend', (event) => {{event.target.remove();}});
-                            toastElem.css('opacity', 0);
-                        }}, 2500);
-                    ", user_id)))}
-                }
-            }
-        },
+    Ok(html! {
+        #"reload-list" hx-get={(nest.as_str())} hx-vals=(format!(r#"{{"search": "{}"}}"#, form.email)) hx-target="#members-list" hx-trigger="load" hx-swap="outerHTML" { progress ."progress"."mt-6" {} }
+        script { "$('#modal')[0].close();" }
 
-        Err(err) => html! {
-            ."alert"."alert-error" role="alert" {
-                (icons::error())
-                span {(err.to_string())}
-            }
-        },
-    }
+        (components::ToastAlert::Success(&format!("{}, {} Added Successfully", form.last_name, form.first_name)))
+    })
 }

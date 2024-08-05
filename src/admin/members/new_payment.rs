@@ -9,7 +9,7 @@ use rust_decimal::Decimal;
 use serde::Deserialize;
 use time::Date;
 
-use crate::{db::members::MemberRow, icons};
+use crate::{components, db::members::MemberRow, err_responses::MapErrorResponse, icons};
 
 pub async fn payment_form(
     nest: NestedPath,
@@ -92,8 +92,8 @@ pub async fn add_payment(
     State(state): State<crate::AppState>,
     Path(user_id): Path<i32>,
     Form(form): Form<NewPaymentFormData>,
-) -> Markup {
-    let sql_result = sqlx::query_scalar!(
+) -> Result<Markup, Response> {
+    sqlx::query_scalar!(
         r#"INSERT INTO payments (member_id, effective_on, duration_months, amount_paid, payment_method, platform, transaction_id, notes)
             VALUES              ($1,        $2,           $3,              $4,          $5,             'mdma',   $6,             $7)
             RETURNING id"#,
@@ -105,37 +105,18 @@ pub async fn add_payment(
         form.transaction_id,
         form.notes
     ).fetch_one(&state.db_pool)
-    .await;
+    .await
+    .map_err_response(crate::err_responses::ErrorResponse::Alert)?;
 
-    match sql_result {
-        Ok(transaction_id) => html! {
-            div hx-swap-oob={"innerHTML:#user_details_"(user_id)} {
-                progress ."progress"."htmx-indicator" {
-                    script {(PreEscaped(format!("
+    Ok(html! {
+        div hx-swap-oob={"innerHTML:#user_details_"(user_id)} {
+            progress ."progress"."htmx-indicator" {
+                script {(PreEscaped(format!("
                         $('#modal')[0].close();
                         htmx.trigger('#user_details_trigger_{}', 'change', {{}});
                     ", user_id)))}
-                }
             }
-            div hx-swap-oob="afterbegin:#alerts" {
-                #{"alert_payment_success_"(transaction_id)}."alert"."alert-success"."transition-opacity"."duration-300" role="alert" {
-                    (icons::success())
-                    span {"Payment Added Successfully"}
-                    script {(PreEscaped(format!("
-                        setTimeout(() => {{
-                            const toastElem = $('#alert_payment_success_{}');
-                            toastElem.on('transitionend', (event) => {{event.target.remove();}});
-                            toastElem.css('opacity', 0);
-                        }}, 2500);
-                    ", transaction_id)))}
-                }
-            }
-        },
-        Err(err) => html! {
-            ."alert"."alert-error" role="alert" {
-                (icons::error())
-                span {(err.to_string())}
-            }
-        },
-    }
+        }
+        (components::ToastAlert::Success("Payment Added Successfully"))
+    })
 }

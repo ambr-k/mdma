@@ -9,6 +9,7 @@ use rust_decimal::prelude::ToPrimitive;
 use serde::Deserialize;
 
 use crate::{
+    components,
     db::members::MemberDetailsRow,
     discord::create_invite,
     err_responses::{ErrorResponse, MapErrorResponse},
@@ -197,18 +198,6 @@ pub async fn send_discord_email(
         .await
         .map_err_response(ErrorResponse::Toast)?;
     Ok(html! {
-        div hx-swap-oob="afterbegin:#alerts" {
-            #{"alert_discord_send_success_"(member_id)}."alert"."alert-success"."transition-opacity"."duration-300" role="alert" {
-                (icons::success())
-                span {"Discord Invite Sent Successfully"}
-                script {(PreEscaped(format!("
-                    setTimeout(() => {{
-                        const toastElem = $('#alert_discord_send_success_{}');
-                        toastElem.on('transitionend', (event) => {{event.target.remove();}});
-                        toastElem.css('opacity', 0);
-                    }}, 2500);
-                ", member_id)))}
-            }
-        }
+        (components::ToastAlert::Success(&format!("Sent Discord Invite to {}", email)))
     })
 }
