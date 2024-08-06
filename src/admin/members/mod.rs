@@ -34,5 +34,9 @@ pub fn router(state: crate::AppState) -> Router {
             "/ban/:member_id",
             get(cancel_ban::ban_form).post(cancel_ban::ban_member),
         )
+        .route(
+            "/unban/:member_id",
+            get(cancel_ban::unban_form).post(cancel_ban::unban_member),
+        )
         .with_state(state.clone())
 }

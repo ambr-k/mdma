@@ -154,3 +154,70 @@ pub async fn ban_member(
         (components::ToastAlert::Success("Banned Member Successfully"))
     })
 }
+
+pub async fn unban_form(
+    nest: NestedPath,
+    Path(member_id): Path<i32>,
+    State(state): State<crate::AppState>,
+) -> Result<Markup, Response> {
+    let member = sqlx::query_as!(MemberRow, "SELECT * FROM members WHERE id = $1", member_id)
+        .fetch_one(&state.db_pool)
+        .await
+        .map_err_response(crate::err_responses::ErrorResponse::Alert)?;
+
+    Ok(html! {
+        h1 ."font-bold"."text-xl" {"Unban Member: "(member.last_name)", "(member.first_name)}
+        ."form-response" {}
+        ."divider" {}
+        form ."mt-3" hx-post={(nest.as_str())"/unban/"(member.id)} hx-target="previous .form-response" hx-indicator="#modal-loading" {
+            ."form-control"."w-full" {
+                ."label" {
+                    span ."label-text" {"Unban Reason"}
+                }
+                input type="text" required name="reason" ."input"."input-bordered"."w-full";
+                ."form-control"."mt-4" { button ."btn"."btn-outline"."btn-primary"."w-1/2"."mx-auto" {(icons::warning())" SUBMIT"} }
+            }
+        }
+    })
+}
+
+pub async fn unban_member(
+    Path(member_id): Path<i32>,
+    State(state): State<crate::AppState>,
+    Extension(admin): Extension<crate::auth::Jwt>,
+    Form(CancelFormData { reason }): Form<CancelFormData>,
+) -> Result<Markup, Response> {
+    if reason.trim().is_empty() {
+        return Err("Must provide a reason")
+            .map_err_response(crate::err_responses::ErrorResponse::Alert);
+    }
+
+    sqlx::query!(
+        r#" UPDATE members
+            SET
+                banned = FALSE,
+                notes = TRIM(E'\n' FROM notes || E'\n\n=== ' || CURRENT_DATE || E' ===\n' || $2)
+            WHERE id = $1"#,
+        member_id,
+        format!(
+            "Unbanned by admin {} : {}",
+            admin.account.email,
+            reason.trim(),
+        )
+    )
+    .execute(&state.db_pool)
+    .await
+    .map_err_response(crate::err_responses::ErrorResponse::Alert)?;
+
+    Ok(html! {
+        div hx-swap-oob={"innerHTML:#user_details_"(member_id)} {
+            progress ."progress"."htmx-indicator" {
+                script {(PreEscaped(format!("
+                        $('#modal')[0].close();
+                        htmx.trigger('#user_details_trigger_{}', 'change', {{}});
+                    ", member_id)))}
+            }
+        }
+        (components::ToastAlert::Success("Unbanned Member Successfully"))
+    })
+}
