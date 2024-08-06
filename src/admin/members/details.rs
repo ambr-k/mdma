@@ -51,8 +51,6 @@ pub async fn details(
         _ => (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()).into_response(),
     })?;
 
-    // tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
-
     let webconnex = state
         .http_client
         .get("https://api.webconnex.com/v2/public/search/customers")
@@ -108,14 +106,26 @@ pub async fn details(
 
     Ok(html! {
         ."divider" {"Member Details"}
+        ."*:mx-1" {
+            @if member.banned { ."badge"."badge-error" {"Banned"} }
+            @else if member.cancelled { ."badge"."badge-warning" {"Cancelled"} }
+            @if member.is_active == Some(true) { ."badge"."badge-success"."badge-outline" {"Active"} }
+            @else { ."badge".{"badge-"(if member.cancelled || member.banned {"outline"} else {"info"})} {"Inactive"} }
+            // ."badge-info"
+        }
         a ."btn"."btn-link" href={"mailto:"(member.email)} {(member.email)}
-        @if let Some(val) = member.consecutive_since {
-            p {"Active since "(val)" ("(member.generation_name.as_deref().unwrap_or("Generation N/A"))")"}
+        @match member.first_payment {
+            None => p {"No recorded payments"},
+            Some(first_payment) => {
+                p {"First joined on "(first_payment)}
+                @if let Some(val) = member.consecutive_since {
+                    p {"Active since "(val)" ("(member.generation_name.as_deref().unwrap_or("<null>"))" Generation)"}
+                }
+                @if let Some(val) = member.consecutive_until {
+                    p {"Active until "(val)}
+                }
+            }
         }
-        @if let Some(val) = member.consecutive_until {
-            p {"Active until "(val)}
-        }
-        @if member.consecutive_until.is_none() { p {"No recorded payments"} }
         ."divider" {"Third-Party Accounts"}
         @for wc_account in webconnex {
             a ."btn"."btn-outline"."btn-primary" href={"https://manage.webconnex.com/contacts/"(wc_account.id)} target="_blank" {"GivingFuel ID "(wc_account.id)}
@@ -147,6 +157,10 @@ pub async fn details(
                     }
                 }
             }
+        }
+        @if !member.notes.is_empty() {
+            ."divider" {"Notes"}
+            pre {(member.notes.trim())}
         }
         ."divider" {"Actions"}
         button ."btn"."btn-secondary"."btn-outline" onclick="openModal()" hx-get={(nest.as_str())"/new_payment/"(member.id)} hx-target="#modal-content" {"Add Payment"}

@@ -70,9 +70,11 @@ pub struct MemberDetailsRow {
     pub email: String,
     pub first_name: String,
     pub last_name: String,
-    pub reason_removed: Option<String>,
+    pub notes: String,
     pub created_on: Date,
     pub discord: Option<Decimal>,
+    pub cancelled: bool,
+    pub banned: bool,
     pub first_payment: Option<Date>,
     pub consecutive_since: Option<Date>,
     pub consecutive_until: Option<Date>,
@@ -88,9 +90,11 @@ pub struct MemberRow {
     pub email: String,
     pub first_name: String,
     pub last_name: String,
-    pub reason_removed: Option<String>,
+    pub notes: String,
     pub created_on: Date,
     pub discord: Option<Decimal>,
+    pub cancelled: bool,
+    pub banned: bool,
 }
 
 trait MembersQueryFilter {
