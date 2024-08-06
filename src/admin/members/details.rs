@@ -160,12 +160,20 @@ pub async fn details(
         }
         @if !member.notes.is_empty() {
             ."divider" {"Notes"}
-            pre {(member.notes.trim())}
+            pre ."w-full"."overflow-x-auto" {(member.notes.trim())}
         }
-        ."divider" {"Actions"}
-        button ."btn"."btn-secondary"."btn-outline" onclick="openModal()" hx-get={(nest.as_str())"/new_payment/"(member.id)} hx-target="#modal-content" {"Add Payment"}
-        a href={"/admin/payments?member_search="(member.id)} ."btn"."btn-secondary"."btn-outline"."mx-2" {"View Payments"}
-        button ."btn"."btn-secondary"."btn-outline" hx-post={(nest.as_str())"/send_discord_email/"(member.id)} hx-swap="none" {(icons::discord())" Send Discord Invite"}
+        ."divider"."mb-0" {"Actions"}
+        ."*:mt-3"."*:mr-2" {
+            button ."btn"."btn-secondary"."btn-outline" onclick="openModal()" hx-get={(nest.as_str())"/new_payment/"(member.id)} hx-target="#modal-content" {"Add Payment"}
+            a href={"/admin/payments?member_search="(member.id)} ."btn"."btn-secondary"."btn-outline" {"View Payments"}
+            button ."btn"."btn-secondary"."btn-outline" hx-post={(nest.as_str())"/send_discord_email/"(member.id)} hx-swap="none" {(icons::discord())" Send Discord Invite"}
+            @if !member.cancelled && !member.banned {
+                button ."btn"."btn-secondary"."btn-outline" onclick="openModal()" hx-get={(nest.as_str())"/cancel/"(member.id)} hx-target="#modal-content" {(icons::warning())" Cancel"}
+            }
+            @if !member.banned {
+                button ."btn"."btn-secondary"."btn-outline" onclick="openModal()" hx-get={(nest.as_str())"/ban/"(member.id)} hx-target="#modal-content" {(icons::warning())" Ban"}
+            }
+        }
     })
 }
 

@@ -3,6 +3,7 @@ use axum::{
     Router,
 };
 
+mod cancel_ban;
 mod create_member;
 mod details;
 mod new_payment;
@@ -24,6 +25,14 @@ pub fn router(state: crate::AppState) -> Router {
         .route(
             "/create",
             get(create_member::member_form).post(create_member::add_member),
+        )
+        .route(
+            "/cancel/:member_id",
+            get(cancel_ban::cancel_form).post(cancel_ban::cancel_member),
+        )
+        .route(
+            "/ban/:member_id",
+            get(cancel_ban::ban_form).post(cancel_ban::ban_member),
         )
         .with_state(state.clone())
 }
