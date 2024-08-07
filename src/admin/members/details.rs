@@ -3,7 +3,7 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use lettre::AsyncTransport;
-use maud::{html, Markup, PreEscaped};
+use maud::{html, Markup};
 use reqwest::StatusCode;
 use rust_decimal::prelude::ToPrimitive;
 use serde::Deserialize;

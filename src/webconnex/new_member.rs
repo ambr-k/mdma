@@ -1,11 +1,5 @@
-use axum::{
-    extract::State,
-    response::{IntoResponse, Response},
-    Json,
-};
+use axum::{extract::State, response::Response, Json};
 use lettre::AsyncTransport;
-use reqwest::StatusCode;
-use serenity::all::ChannelId;
 
 use crate::{
     discord::create_invite,

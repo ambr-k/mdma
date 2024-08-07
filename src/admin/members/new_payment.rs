@@ -9,7 +9,7 @@ use rust_decimal::Decimal;
 use serde::Deserialize;
 use time::Date;
 
-use crate::{components, db::members::MemberRow, err_responses::MapErrorResponse, icons};
+use crate::{components, db::members::MemberRow, err_responses::MapErrorResponse};
 
 pub async fn payment_form(
     nest: NestedPath,

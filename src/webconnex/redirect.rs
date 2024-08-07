@@ -1,10 +1,9 @@
 use axum::{
     extract::{Path, State},
-    response::{IntoResponse, Redirect, Response},
+    response::{Redirect, Response},
     routing::get,
     Router,
 };
-use reqwest::StatusCode;
 use serde::Deserialize;
 
 use crate::err_responses::{ErrorResponse, MapErrorResponse};

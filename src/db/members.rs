@@ -270,6 +270,7 @@ pub enum Members {
     Discord,
 }
 
+#[allow(dead_code)]
 #[derive(Iden)]
 enum MemberDetails {
     Table,

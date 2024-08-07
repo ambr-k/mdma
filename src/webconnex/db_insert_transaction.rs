@@ -1,7 +1,4 @@
-use axum::{
-    http::StatusCode,
-    response::{IntoResponse, Response},
-};
+use axum::response::Response;
 
 use crate::err_responses::{ErrorResponse, MapErrorResponse};
 

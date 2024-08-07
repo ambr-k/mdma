@@ -1,10 +1,9 @@
 use axum::{
     extract::{NestedPath, Query, State},
     http::HeaderMap,
-    response::{IntoResponse, Response},
+    response::Response,
 };
 use maud::{html, Markup};
-use reqwest::StatusCode;
 use tokio::try_join;
 
 use crate::{

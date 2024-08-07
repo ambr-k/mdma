@@ -2,13 +2,13 @@ use std::str::FromStr;
 
 use axum::{
     extract::{NestedPath, State},
-    response::{IntoResponse, Response},
+    response::Response,
     Form,
 };
 use maud::{html, Markup};
 use serde::Deserialize;
 
-use crate::{components, err_responses::MapErrorResponse, icons};
+use crate::{components, err_responses::MapErrorResponse};
 
 pub async fn member_form(nest: NestedPath) -> Markup {
     html! {
