@@ -16,17 +16,10 @@ struct Campaign {
 }
 
 #[derive(serde::Deserialize)]
-struct Donor {
-    first_name: String,
-    last_name: String,
-    email: String,
-}
-
-#[derive(serde::Deserialize)]
 pub struct DonationEvent {
     action: String,
     campaign: Campaign,
-    donor: Donor,
+    donor: super::Donor,
     net_amount: Decimal,
     id: i32,
     #[serde(with = "time::serde::iso8601")]

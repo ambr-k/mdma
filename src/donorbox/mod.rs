@@ -3,6 +3,14 @@ use axum::{middleware::from_fn_with_state, routing::post, Router};
 mod auth;
 mod new_donation;
 
+#[derive(serde::Deserialize)]
+pub struct Donor {
+    pub id: i32,
+    pub first_name: String,
+    pub last_name: String,
+    pub email: String,
+}
+
 pub fn router(state: crate::AppState) -> Router {
     Router::new()
         .route("/new-donation", post(new_donation::webhook_handler))

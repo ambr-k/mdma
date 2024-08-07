@@ -68,6 +68,21 @@ pub async fn details(
         .data
         .unwrap_or_default();
 
+    let donorbox = state
+        .http_client
+        .get("https://donorbox.org/api/v1/donors")
+        .basic_auth(
+            state.secret_store.get("DONORBOX_APILOGIN").unwrap(),
+            state.secret_store.get("DONORBOX_APIKEY"),
+        )
+        .query(&[("email", &member.email)])
+        .send()
+        .await
+        .map_err_response(ErrorResponse::InternalServerError)?
+        .json::<Vec<crate::donorbox::Donor>>()
+        .await
+        .map_err_response(ErrorResponse::InternalServerError)?;
+
     let discord_opt = match member.discord.and_then(|uid| uid.to_u64()) {
         None => None,
         Some(uid) => {
@@ -127,8 +142,13 @@ pub async fn details(
             }
         }
         ."divider" {"Third-Party Accounts"}
-        @for wc_account in webconnex {
-            a ."btn"."btn-outline"."btn-primary" href={"https://manage.webconnex.com/contacts/"(wc_account.id)} target="_blank" {"GivingFuel ID "(wc_account.id)}
+        ."*:mr-2" {
+            @for wc_account in webconnex {
+                a ."btn"."btn-outline"."btn-primary" href={"https://manage.webconnex.com/contacts/"(wc_account.id)} target="_blank" {"GivingFuel ID "(wc_account.id)}
+            }
+            @for db_account in donorbox {
+                a ."btn"."btn-outline"."btn-primary" href={"https://donorbox.org/org_admin/supporters/"(db_account.id)} target="_blank" {"Donorbox ID "(db_account.id)}
+            }
         }
         @if let Some(discord) = discord_opt {
             ."card"."card-compact"."card-side"."bg-neutral"."h-24"."w-full"."max-w-sm"."mx-auto"."my-2" {
