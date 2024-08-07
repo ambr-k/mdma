@@ -19,14 +19,13 @@ pub async fn insert_transaction(
 ) -> Result<InsertTransactionResponse, Response> {
     sqlx::query_as!(
         InsertTransactionResponse,
-        r#"INSERT INTO payments (member_id, amount_paid, payment_method, platform, transaction_id)
-            SELECT id, $2, $3, 'webconnex', $4
+        r#"INSERT INTO payments (member_id, amount_paid, payment_method, transaction_id)
+            SELECT               id,        $2,          'webconnex',    $3
             FROM members
             WHERE email = $1
         RETURNING id, member_id"#,
         body.billing.email.to_lowercase(),
         body.total,
-        body.billing.payment_method,
         body.transaction_id
     )
     .fetch_one(&state.db_pool)

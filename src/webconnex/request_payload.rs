@@ -16,7 +16,6 @@ pub struct Name {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Billing {
-    pub payment_method: String,
     pub email: String,
     pub name: Name,
 }

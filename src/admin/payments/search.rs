@@ -7,7 +7,11 @@ use maud::{html, Markup};
 use reqwest::StatusCode;
 use tokio::try_join;
 
-use crate::{db::payments::PaymentsQuery, err_responses::{ErrorResponse, MapErrorResponse}, icons};
+use crate::{
+    db::payments::PaymentsQuery,
+    err_responses::{ErrorResponse, MapErrorResponse},
+    icons,
+};
 
 pub async fn search_form(nest: NestedPath, Query(params): Query<PaymentsQuery>) -> Markup {
     html! { #"payments_list" ."w-full"."max-w-4xl"."mx-auto" {
@@ -109,8 +113,9 @@ pub async fn search_results(
                     td {"$"(payment.amount_paid.round_dp(2))}
                     td {(payment.payment_method.as_deref().unwrap_or_default())}
                     td {
-                        @match payment.platform.as_deref() {
+                        @match payment.payment_method.as_deref() {
                             Some("webconnex") => { a href={"/.webconnex/redirect/transaction/"(payment.transaction_id.unwrap_or_default())} target="_blank" ."btn"."btn-circle"."btn-outline" {(icons::open_external())} },
+                            Some("donorbox") => { a href={"https://donorbox.org/org_admin/donations/"(payment.transaction_id.unwrap_or_default())} target="_blank" ."btn"."btn-circle"."btn-outline" {(icons::open_external())} },
                             _ => {}
                         }
                     }

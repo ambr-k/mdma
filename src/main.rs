@@ -16,6 +16,7 @@ mod auth;
 mod components;
 mod db;
 mod discord;
+mod donorbox;
 mod err_responses;
 mod icons;
 mod send_email;
@@ -109,6 +110,7 @@ async fn main(
         .with_state(state.clone())
         .nest("/admin", admin::router(state.clone()))
         .nest("/.webconnex", webconnex::router(state.clone()))
+        .nest("/.donorbox", donorbox::router(state.clone()))
         .nest_service("/assets", ServeDir::new("static"));
 
     Ok(router.into())

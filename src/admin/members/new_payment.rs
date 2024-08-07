@@ -94,8 +94,8 @@ pub async fn add_payment(
     Form(form): Form<NewPaymentFormData>,
 ) -> Result<Markup, Response> {
     sqlx::query_scalar!(
-        r#"INSERT INTO payments (member_id, effective_on, duration_months, amount_paid, payment_method, platform, transaction_id, notes)
-            VALUES              ($1,        $2,           $3,              $4,          $5,             'mdma',   $6,             $7)
+        r#"INSERT INTO payments (member_id, effective_on, duration_months, amount_paid, payment_method, transaction_id, notes)
+            VALUES              ($1,        $2,           $3,              $4,          $5,             $6,             $7)
             RETURNING id"#,
         user_id,
         form.effective_on,

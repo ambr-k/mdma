@@ -51,8 +51,8 @@ struct GivingFuelDonationRow {
     #[serde(rename = "Total Paid ($ Amount)")]
     total: Option<Decimal>,
     // #[serde(rename = "Currency")]
-    #[serde(rename = "Payment Method")]
-    payment_method: String,
+    // #[serde(rename = "Payment Method")]
+    // payment_method: String,
     // #[serde(rename = "Payment Account")]
     // #[serde(rename = "Expiration Month")]
     // #[serde(rename = "Expiration Year")]
@@ -178,14 +178,13 @@ pub async fn submit_givingfuel_bulk_update(
         }
 
         sqlx::query!(
-            r#"INSERT INTO payments (member_id, effective_on, amount_paid, payment_method, platform, transaction_id)
-                SELECT id, $2, $3, $4, 'webconnex', $5
+            r#"INSERT INTO payments (member_id, effective_on, amount_paid, payment_method, transaction_id)
+                SELECT               id,        $2,           $3,          'webconnex',    $4
                 FROM members
                 WHERE email = $1"#,
             row.email,
             row.payment_date.date(),
             row.total.unwrap(),
-            row.payment_method,
             row.transaction_id
         )
         .execute(&mut *transaction)

@@ -38,7 +38,6 @@ pub struct PaymentRow {
     pub duration_months: i32,
     pub amount_paid: Decimal,
     pub payment_method: Option<String>,
-    pub platform: Option<String>,
     pub transaction_id: Option<i32>,
     pub notes: Option<String>,
     pub first_name: String,
@@ -144,7 +143,6 @@ enum Payments {
     DurationMonths,
     AmountPaid,
     PaymentMethod,
-    Platform,
     TransactionId,
     Notes,
 }
