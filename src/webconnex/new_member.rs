@@ -29,7 +29,10 @@ async fn send_emails(state: &crate::AppState, event: &EventDetails) -> Result<()
         .map_err_response(ErrorResponse::InternalServerError)?;
     let values = EmailValues {
         first_name: event.billing.name.first.clone(),
+        last_name: event.billing.name.last.clone(),
         invite_url,
+        email: event.billing.email.clone(),
+        ..Default::default()
     };
 
     mailer

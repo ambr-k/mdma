@@ -66,6 +66,10 @@ pub async fn email_addresses_form(
                 ."label" { span ."label-text" {"Reply-To"} }
                 input type="text" name="replyto_address" value=(state.persist.load::<String>("replyto_address").unwrap_or_default()) ."input"."input-bordered"."w-full";
             }
+            label ."form-control"."w-full"."max-w-lg"."mx-auto" {
+                ."label" { span ."label-text" {"Board Notification"} }
+                input type="text" name="board_notif_address" value=(state.persist.load::<String>("board_notif_address").unwrap_or_default()) ."input"."input-bordered"."w-full";
+            }
             button ."btn"."btn-primary"."w-1/2"."block"."mx-auto"."!mb-0"."mt-2" {"UPDATE"}
         }
     }
@@ -75,6 +79,7 @@ pub async fn email_addresses_form(
 pub struct EmailAddressesFormData {
     from_address: String,
     replyto_address: String,
+    board_notif_address: String,
 }
 
 pub async fn set_email_addresses(
@@ -91,6 +96,11 @@ pub async fn set_email_addresses(
             ."alert"."alert-error" {(icons::error()) span {"Invalid 'Reply-To' Address: "(err)}}
         };
     }
+    if let Err(err) = form.board_notif_address.parse::<Mailbox>() {
+        return html! {
+            ."alert"."alert-error" {(icons::error()) span {"Invalid 'Board Notification' Address: "(err)}}
+        };
+    }
     if let Err(err) = state.persist.save("from_address", form.from_address) {
         return html! {
             ."alert"."alert-error" {(icons::error()) span {(err)}}
@@ -101,33 +111,30 @@ pub async fn set_email_addresses(
             ."alert"."alert-error" {(icons::error()) span {(err)}}
         };
     }
+    if let Err(err) = state
+        .persist
+        .save("board_notif_address", form.board_notif_address)
+    {
+        return html! {
+            ."alert"."alert-error" {(icons::error()) span {(err)}}
+        };
+    }
     html! {."alert"."alert-success" {(icons::success()) span {"Successfully updated email addresses!"}}}
-}
-
-#[derive(Deserialize)]
-pub struct SendEmailParams {
-    pub first_name: String,
-    pub invite_url: String,
-    pub email: String,
 }
 
 pub async fn send_email(
     Path(email_key): Path<String>,
     State(state): State<crate::AppState>,
-    Query(params): Query<SendEmailParams>,
+    Query(params): Query<EmailValues>,
 ) -> Result<Response, Response> {
     let mailer = build_mailer(&state)
         .await
         .map_err_response(ErrorResponse::InternalServerError)?;
-    let values = EmailValues {
-        first_name: params.first_name,
-        invite_url: params.invite_url,
-    };
     let message = build_message(
         &email_key,
         "Psychedelic Club Discord",
         &params.email,
-        &values,
+        &params,
         &state,
     )
     .map_err_response(ErrorResponse::InternalServerError)?;

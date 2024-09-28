@@ -8,10 +8,24 @@ use serde::{Deserialize, Serialize};
 use shuttle_persist::PersistInstance;
 use tinytemplate::TinyTemplate;
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Default)]
+#[serde(default)]
 pub struct EmailValues {
     pub first_name: String,
+    pub last_name: String,
     pub invite_url: String,
+    pub email: String,
+    pub timestamp: String,
+    pub amount_paid: String,
+    pub donor_id: String,
+    pub donor_url: String,
+    pub donation_id: String,
+    pub donation_url: String,
+    pub plan_id: String,
+    pub plan_url: String,
+    pub payment_id: String,
+    pub payment_url: String,
+    pub referral_source: String,
 }
 
 pub fn sanitize_email(contents: &str) -> String {

@@ -234,6 +234,7 @@ pub async fn send_discord_email(
         &EmailValues {
             first_name,
             invite_url,
+            ..Default::default()
         },
         &state,
     )

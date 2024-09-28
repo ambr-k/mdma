@@ -3,6 +3,7 @@ use lettre::AsyncTransport;
 use reqwest::StatusCode;
 use rust_decimal::Decimal;
 use time::OffsetDateTime;
+use tokio::try_join;
 
 use crate::{
     discord::create_invite,
@@ -15,6 +16,13 @@ struct Campaign {
     id: i32,
 }
 
+#[derive(serde::Deserialize, Clone, Default)]
+#[allow(dead_code)]
+struct Question {
+    question: String,
+    answer: String,
+}
+
 #[derive(serde::Deserialize)]
 pub struct DonationEvent {
     action: String,
@@ -22,8 +30,12 @@ pub struct DonationEvent {
     donor: super::Donor,
     net_amount: Decimal,
     id: i32,
+    formatted_net_amount: String,
+    stripe_charge_id: String,
     #[serde(with = "time::serde::iso8601")]
     donation_date: OffsetDateTime,
+    plan_id: i32,
+    questions: Vec<Question>,
 }
 
 #[derive(serde::Serialize)]
@@ -54,21 +66,55 @@ async fn send_emails(state: &crate::AppState, event: &DonationEvent) -> Result<(
         .map_err_response(ErrorResponse::InternalServerError)?;
     let values = EmailValues {
         first_name: event.donor.first_name.clone(),
+        last_name: event.donor.last_name.clone(),
         invite_url,
+        email: event.donor.email.clone(),
+        timestamp: event.donation_date.to_string(),
+        amount_paid: event.formatted_net_amount.clone(),
+        donor_id: event.donor.id.to_string(),
+        donor_url: format!(
+            "https://donorbox.org/org_admin/supporters/{}",
+            event.donor.id
+        ),
+        donation_id: event.id.to_string(),
+        donation_url: format!("https://donorbox.org/org_admin/donations/{}", event.id),
+        plan_id: event.plan_id.to_string(),
+        plan_url: format!("https://donorbox.org/org_admin/plans/{}", event.plan_id),
+        payment_id: event.stripe_charge_id.clone(),
+        payment_url: format!(
+            "https://dashboard.stripe.com/payments/{}",
+            event.stripe_charge_id
+        ),
+        referral_source: event.questions.get(0).cloned().unwrap_or_default().answer,
     };
 
-    mailer
-        .send(
-            build_message(
-                "discord",
-                "Psychedelic Club Discord",
-                &event.donor.email,
-                &values,
-                state,
-            )
-            .map_err_response(ErrorResponse::InternalServerError)?,
+    let board_notif_address = state
+        .persist
+        .load::<String>("board_notif_address")
+        .map_err_response(ErrorResponse::InternalServerError)?;
+    let board_notif_future = mailer.send(
+        build_message(
+            "board_notif",
+            "Psychedelic Club Discord",
+            &board_notif_address,
+            &values,
+            state,
         )
-        .await
+        .map_err_response(ErrorResponse::InternalServerError)?,
+    );
+
+    let discord_future = mailer.send(
+        build_message(
+            "discord",
+            "Psychedelic Club Discord",
+            &event.donor.email,
+            &values,
+            state,
+        )
+        .map_err_response(ErrorResponse::InternalServerError)?,
+    );
+
+    try_join!(discord_future, board_notif_future)
         .map_err_response(ErrorResponse::InternalServerError)?;
     Ok(())
 }
@@ -95,7 +141,8 @@ pub async fn webhook_handler(
 
     let created_member_id = sqlx::query_scalar!(
         "INSERT INTO members (email, first_name, last_name)
-        VALUES ($1, $2, $3)
+        SELECT $1, $2, $3
+        WHERE NOT EXISTS (SELECT * FROM members WHERE email = $1)
         ON CONFLICT DO NOTHING
         RETURNING id",
         event.donor.email,
