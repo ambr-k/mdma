@@ -95,7 +95,7 @@ async fn send_emails(state: &crate::AppState, event: &DonationEvent) -> Result<(
     let board_notif_future = mailer.send(
         build_message(
             "board_notif",
-            "Psychedelic Club Discord",
+            "New Member Notification",
             &board_notif_address,
             &values,
             state,
