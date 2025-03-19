@@ -49,6 +49,6 @@ pub async fn transaction(
 
 pub fn router(state: crate::AppState) -> Router {
     Router::new()
-        .route("/transaction/:txid", get(transaction))
+        .route("/transaction/{txid}", get(transaction))
         .with_state(state.clone())
 }

@@ -44,6 +44,7 @@ async fn send_emails(state: &crate::AppState, event: &EventDetails) -> Result<()
                 &values,
                 state,
             )
+            .await
             .map_err_response(ErrorResponse::InternalServerError)?,
         )
         .await

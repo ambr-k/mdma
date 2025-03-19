@@ -33,10 +33,10 @@ pub fn router(state: crate::AppState) -> Router {
     Router::new()
         .route("/", get(home))
         .route(
-            "/email_contents/:email_key",
+            "/email_contents/{email_key}",
             get(emails::email_contents_form).post(emails::set_email_contents),
         )
-        .route("/send_email/:email_key", get(emails::send_email))
+        .route("/send_email/{email_key}", get(emails::send_email))
         .route(
             "/email_addresses",
             get(emails::email_addresses_form).post(emails::set_email_addresses),

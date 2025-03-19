@@ -238,6 +238,7 @@ pub async fn send_discord_email(
         },
         &state,
     )
+    .await
     .map_err_response(ErrorResponse::Toast)?;
 
     mailer

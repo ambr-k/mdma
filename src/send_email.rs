@@ -5,7 +5,6 @@ use lettre::{
 };
 use oauth2::{AccessToken, RefreshToken, TokenResponse};
 use serde::{Deserialize, Serialize};
-use shuttle_persist::PersistInstance;
 use tinytemplate::TinyTemplate;
 
 #[derive(Deserialize, Serialize, Default)]
@@ -28,6 +27,42 @@ pub struct EmailValues {
     pub referral_source: String,
 }
 
+pub async fn get_email_template(id: &str, db_pool: &sqlx::PgPool) -> Result<String, sqlx::Error> {
+    sqlx::query_scalar!("SELECT template FROM email_templates WHERE id = $1", id)
+        .fetch_one(db_pool)
+        .await
+}
+
+pub async fn insert_email_template(
+    id: &str,
+    template: &str,
+    db_pool: &sqlx::PgPool,
+) -> Result<(), sqlx::Error> {
+    sqlx::query_scalar!(
+        "INSERT INTO email_templates (id, template) VALUES ($1, $2) ON CONFLICT (id) DO UPDATE SET template = excluded.template",
+        id,
+        template
+    ).execute(db_pool).await.map(|_| ())
+}
+
+pub async fn insert_email_address(
+    id: &str,
+    template: &str,
+    db_pool: &sqlx::PgPool,
+) -> Result<(), sqlx::Error> {
+    sqlx::query_scalar!(
+        "INSERT INTO email_addresses (id, value) VALUES ($1, $2) ON CONFLICT (id) DO UPDATE SET value = excluded.value",
+        id,
+        template
+    ).execute(db_pool).await.map(|_| ())
+}
+
+pub async fn get_email_address(id: &str, db_pool: &sqlx::PgPool) -> Result<String, sqlx::Error> {
+    sqlx::query_scalar!("SELECT value FROM email_addresses WHERE id = $1", id)
+        .fetch_one(db_pool)
+        .await
+}
+
 pub fn sanitize_email(contents: &str) -> String {
     ammonia::Builder::new()
         .add_generic_attributes(&["style"])
@@ -35,18 +70,14 @@ pub fn sanitize_email(contents: &str) -> String {
         .to_string()
 }
 
-pub fn populate_email(
-    email_key: &str,
+fn populate_email_template(
+    template: &str,
     values: &EmailValues,
-    persist: &PersistInstance,
 ) -> Result<String, tinytemplate::error::Error> {
-    let raw_contents = persist
-        .load::<String>(&format!("email.{email_key}"))
-        .unwrap_or_default();
     let mut templ = TinyTemplate::new();
-    templ.add_template("discord_email", &raw_contents)?;
+    templ.add_template("email_template", &template)?;
     templ
-        .render("discord_email", values)
+        .render("email_template", values)
         .map(|populated| sanitize_email(&populated))
 }
 
@@ -77,22 +108,20 @@ pub async fn build_mailer(
     )
 }
 
-pub fn build_message(
+pub async fn build_message(
     email_key: &str,
     subject: &str,
     to_address: &str,
     values: &EmailValues,
     state: &crate::AppState,
 ) -> Result<Message, String> {
-    let from_mbox = state
-        .persist
-        .load::<String>("from_address")
+    let from_mbox = get_email_address("from", &state.db_pool)
+        .await
         .map_err(|err| err.to_string())?
         .parse::<Mailbox>()
         .map_err(|err| err.to_string())?;
-    let replyto_mbox = state
-        .persist
-        .load::<String>("replyto_address")
+    let replyto_mbox = get_email_address("replyto", &state.db_pool)
+        .await
         .map_err(|err| err.to_string())?
         .parse::<Mailbox>()
         .map_err(|err| err.to_string())?;
@@ -100,13 +129,17 @@ pub fn build_message(
         .parse::<Mailbox>()
         .map_err(|err| err.to_string())?;
 
+    let email_template = get_email_template(email_key, &state.db_pool)
+        .await
+        .map_err(|err| err.to_string())?;
+    let email_body =
+        populate_email_template(&email_template, values).map_err(|err| err.to_string())?;
+
     Message::builder()
         .from(from_mbox)
         .reply_to(replyto_mbox)
         .to(to_mbox)
         .subject(subject)
-        .singlepart(SinglePart::html(
-            populate_email(email_key, values, &state.persist).map_err(|err| err.to_string())?,
-        ))
+        .singlepart(SinglePart::html(email_body))
         .map_err(|err| err.to_string())
 }

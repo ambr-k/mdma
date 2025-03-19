@@ -8,7 +8,7 @@ use tokio::try_join;
 use crate::{
     discord::create_invite,
     err_responses::{ErrorResponse, MapErrorResponse},
-    send_email::{build_mailer, build_message, EmailValues},
+    send_email::{build_mailer, build_message, get_email_address, EmailValues},
 };
 
 #[derive(serde::Deserialize)]
@@ -88,9 +88,8 @@ async fn send_emails(state: &crate::AppState, event: &DonationEvent) -> Result<(
         referral_source: event.questions.get(0).cloned().unwrap_or_default().answer,
     };
 
-    let board_notif_address = state
-        .persist
-        .load::<String>("board_notif_address")
+    let board_notif_address = get_email_address("board_notif", &state.db_pool)
+        .await
         .map_err_response(ErrorResponse::InternalServerError)?;
     let board_notif_future = mailer.send(
         build_message(
@@ -100,6 +99,7 @@ async fn send_emails(state: &crate::AppState, event: &DonationEvent) -> Result<(
             &values,
             state,
         )
+        .await
         .map_err_response(ErrorResponse::InternalServerError)?,
     );
 
@@ -111,6 +111,7 @@ async fn send_emails(state: &crate::AppState, event: &DonationEvent) -> Result<(
             &values,
             state,
         )
+        .await
         .map_err_response(ErrorResponse::InternalServerError)?,
     );
 

@@ -1,5 +1,6 @@
 use axum::response::IntoResponse;
 use maud::{html, Markup, PreEscaped, Render, DOCTYPE};
+use uuid::Uuid;
 
 use crate::icons;
 
@@ -45,7 +46,7 @@ pub enum ToastAlert<'a> {
 
 impl Render for ToastAlert<'_> {
     fn render(&self) -> Markup {
-        let toastid = sqlx::types::Uuid::new_v4().simple();
+        let toastid = Uuid::new_v4().simple();
         let classname = match self {
             Self::Success(_) => "alert-success",
             Self::Error(_) => "alert-error",
@@ -54,8 +55,8 @@ impl Render for ToastAlert<'_> {
         html! {div hx-swap-oob="afterbegin:#alerts" {
             #{"toast_"(toastid)}."alert"."transition-opacity"."duration-300".(classname) role="alert" {
                 @match self {
-                    Self::Success(text) => (icons::success()) span {(text)},
-                    Self::Error(text) => (icons::error()) span {(text)},
+                    Self::Success(text) => { (icons::success()) span {(text)} },
+                    Self::Error(text) => { (icons::error()) span {(text)} },
                 }
                 script {(PreEscaped(format!("
                     setTimeout(() => {{

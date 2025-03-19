@@ -30,6 +30,7 @@ pub struct PaymentsQuery {
 }
 
 #[derive(FromRow)]
+#[allow(dead_code)]
 pub struct PaymentRow {
     pub id: i32,
     pub member_id: i32,

@@ -1,1 +1,7 @@
 assets = ["static/*", ".sqlx/*"]
+
+[deploy]
+include = ["static/*", ".sqlx/*"]
+
+[build]
+assets = ["static/*"]

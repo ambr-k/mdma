@@ -21,3 +21,6 @@ Secrets.*.toml
 .shuttle-storage
 
 .sqlx/
+/target
+.shuttle*
+Secrets*.toml
