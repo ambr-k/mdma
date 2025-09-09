@@ -25,7 +25,7 @@ struct Question {
 
 #[derive(serde::Deserialize)]
 pub struct DonationEvent {
-    action: String,
+    action: Option<String>,
     campaign: Campaign,
     donor: super::Donor,
     net_amount: Decimal,
@@ -46,7 +46,7 @@ struct InsertTransactionResult {
 
 #[derive(serde::Serialize)]
 pub struct ResponseBody {
-    created_member_id: Option<i32>,
+    pub created_member_id: Option<i32>,
     inserted_transaction: InsertTransactionResult,
 }
 
@@ -120,14 +120,11 @@ async fn send_emails(state: &crate::AppState, event: &DonationEvent) -> Result<(
     Ok(())
 }
 
-pub async fn webhook_handler(
-    State(state): State<crate::AppState>,
-    Json([event]): Json<[DonationEvent; 1]>,
-) -> Result<Json<ResponseBody>, Response> {
-    if event.action != "new" {
-        return Err("action != 'new'")
-            .map_err_response(ErrorResponse::StatusCode(StatusCode::NO_CONTENT));
-    }
+pub async fn process_donation(
+    state: &crate::AppState,
+    event: &DonationEvent,
+    allow_email: bool,
+) -> Result<ResponseBody, Response> {
     if event.campaign.id
         != state
             .secret_store
@@ -167,12 +164,23 @@ pub async fn webhook_handler(
         event.donation_date.date()
     ).fetch_one(&state.db_pool).await.map_err_response(ErrorResponse::InternalServerError)?;
 
-    if created_member_id.is_some() {
+    if allow_email && created_member_id.is_some() {
         send_emails(&state, &event).await?;
     }
 
-    Ok(Json(ResponseBody {
+    Ok(ResponseBody {
         created_member_id,
         inserted_transaction,
-    }))
+    })
+}
+
+pub async fn webhook_handler(
+    State(state): State<crate::AppState>,
+    Json([event]): Json<[DonationEvent; 1]>,
+) -> Result<Json<ResponseBody>, Response> {
+    if event.action.as_deref() != Some("new") {
+        return Err("action != 'new'")
+            .map_err_response(ErrorResponse::StatusCode(StatusCode::NO_CONTENT));
+    }
+    process_donation(&state, &event, true).await.map(Json)
 }

@@ -1,7 +1,7 @@
 use axum::{middleware::from_fn_with_state, routing::post, Router};
 
 mod auth;
-mod new_donation;
+pub mod new_donation;
 
 #[derive(serde::Deserialize)]
 pub struct Donor {

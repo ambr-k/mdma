@@ -35,6 +35,24 @@ pub async fn bulk_update_form(nest: NestedPath) -> Markup {
                 }
             }
         }
+        ."collapse"."collapse-arrow"."bg-base-200"."w-full"."max-w-xl"."mx-auto"."mt-4"."outline"."outline-1" {
+            input type="checkbox";
+            ."collapse-title"."text-xl"."font-medium" {"Donorbox Donations Import"}
+            ."collapse-content" {
+                form #"donorbox-bulk-import-form" hx-encoding="multipart/form-data" hx-post={(nest.as_str())"/.donorbox_bulk_import"} {
+                    label ."form-control"."w-full" {
+                        ."label"."cursor-pointer" { span ."label-text" {"Start Date"} }
+                        input type="date" name="start-date" required #"donorbox_bulk_import__start_date" ."input"."input-bordered"."cursor-pointer";
+                        script {"$('#donorbox_bulk_import__start_date')[0].valueAsDate = new Date();"}
+                    }
+                    label ."form-control"."w-full" {
+                        ."label" { span ."label-text" {"Enter your email to prove you know what you're doing..."} }
+                        input type="text" name="email-verify" placeholder="Email" ."input"."input-bordered";
+                        button ."btn"."btn-secondary"."w-1/3"."mx-auto"."mt-4" {"IMPORT"}
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -207,4 +225,95 @@ pub async fn submit_givingfuel_bulk_update(
         ),
     )
         .into_response())
+}
+
+pub async fn submit_donorbox_bulk_update(
+    Extension(user): Extension<crate::auth::Jwt>,
+    State(state): State<crate::AppState>,
+    mut multipart: Multipart,
+) -> Result<Response, Response> {
+    let mut email_verified = false;
+    let mut start_date: Option<String> = None;
+
+    while let Some(field) = multipart.next_field().await.unwrap() {
+        match field.name().unwrap() {
+            "email-verify" => {
+                email_verified = field.text().await.unwrap() == user.account.email;
+            }
+            "start-date" => {
+                start_date = Some(field.text().await.unwrap());
+            }
+            _ => (),
+        }
+    }
+
+    if !email_verified {
+        return Err((StatusCode::BAD_REQUEST, "Email does not match").into_response());
+    }
+    if start_date.is_none() {
+        return Err((StatusCode::BAD_REQUEST, "Invalid Start Date").into_response());
+    }
+
+    let donations = state
+        .http_client
+        .get("https://donorbox.org/api/v1/donations")
+        .basic_auth(
+            state.secret_store.get("DONORBOX_APILOGIN").unwrap(),
+            state.secret_store.get("DONORBOX_APIKEY"),
+        )
+        .query(&[("date_from", start_date)])
+        .send()
+        .await
+        .map_err_response(ErrorResponse::InternalServerError)?
+        .json::<Vec<crate::donorbox::new_donation::DonationEvent>>()
+        .await
+        .map_err_response(ErrorResponse::InternalServerError)?;
+
+    let mut new_members: u32 = 0;
+    let mut transactions: u32 = 0;
+    let mut errors: Vec<String> = Vec::new();
+    for don in donations {
+        match crate::donorbox::new_donation::process_donation(&state, &don, false).await {
+            Ok(crate::donorbox::new_donation::ResponseBody {
+                created_member_id: created,
+                ..
+            }) => {
+                transactions += 1;
+                if created.is_some() {
+                    new_members += 1;
+                }
+            }
+            Err(err) => {
+                errors.push(
+                    String::from_utf8(
+                        axum::body::to_bytes(err.into_body(), usize::MAX)
+                            .await
+                            .unwrap()
+                            .to_vec(),
+                    )
+                    .unwrap(),
+                );
+            }
+        };
+    }
+
+    let resp = if errors.is_empty() {
+        format!(
+            "Added {} members and {} payments successfully",
+            new_members, transactions
+        )
+    } else {
+        let mut wip = format!(
+            "Added {} members and {} payments with {} errors",
+            new_members,
+            transactions,
+            errors.len()
+        );
+        for err in &errors {
+            wip += &("<br>".to_string() + err);
+        }
+        wip
+    };
+
+    Ok((StatusCode::OK, resp).into_response())
 }

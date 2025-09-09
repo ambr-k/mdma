@@ -62,6 +62,10 @@ pub fn router(state: crate::AppState) -> Router {
             "/.givingfuel_bulk_import",
             post(bulk_update::submit_givingfuel_bulk_update),
         )
+        .route(
+            "/.donorbox_bulk_import",
+            post(bulk_update::submit_donorbox_bulk_update),
+        )
         .with_state(state.clone())
         .nest("/config", config::router(state.clone()))
         .nest("/members", members::router(state.clone()))
