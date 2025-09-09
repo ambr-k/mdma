@@ -254,47 +254,61 @@ pub async fn submit_donorbox_bulk_update(
         return Err((StatusCode::BAD_REQUEST, "Invalid Start Date").into_response());
     }
 
-    let donations = state
-        .http_client
-        .get("https://donorbox.org/api/v1/donations")
-        .basic_auth(
-            state.secret_store.get("DONORBOX_APILOGIN").unwrap(),
-            state.secret_store.get("DONORBOX_APIKEY"),
-        )
-        .query(&[("date_from", start_date)])
-        .send()
-        .await
-        .map_err_response(ErrorResponse::InternalServerError)?
-        .json::<Vec<crate::donorbox::new_donation::DonationEvent>>()
-        .await
-        .map_err_response(ErrorResponse::InternalServerError)?;
-
     let mut new_members: u32 = 0;
     let mut transactions: u32 = 0;
     let mut errors: Vec<String> = Vec::new();
-    for don in donations {
-        match crate::donorbox::new_donation::process_donation(&state, &don, false).await {
-            Ok(crate::donorbox::new_donation::ResponseBody {
-                created_member_id: created,
-                ..
-            }) => {
-                transactions += 1;
-                if created.is_some() {
-                    new_members += 1;
+    let mut page = 1;
+    loop {
+        let donations = state
+            .http_client
+            .get("https://donorbox.org/api/v1/donations")
+            .basic_auth(
+                state.secret_store.get("DONORBOX_APILOGIN").unwrap(),
+                state.secret_store.get("DONORBOX_APIKEY"),
+            )
+            .query(&[
+                ("date_from", start_date.clone().unwrap()),
+                ("page", page.to_string()),
+            ])
+            .send()
+            .await
+            .map_err_response(ErrorResponse::InternalServerError)?
+            .json::<Vec<crate::donorbox::new_donation::DonationEvent>>()
+            .await
+            .map_err_response(ErrorResponse::InternalServerError)?;
+
+        if donations.is_empty() {
+            break;
+        }
+
+        for don in donations {
+            match crate::donorbox::new_donation::process_donation(&state, &don, false).await {
+                Ok(crate::donorbox::new_donation::ResponseBody {
+                    created_member_id: created,
+                    ..
+                }) => {
+                    transactions += 1;
+                    if created.is_some() {
+                        new_members += 1;
+                    }
                 }
-            }
-            Err(err) => {
-                errors.push(
-                    String::from_utf8(
-                        axum::body::to_bytes(err.into_body(), usize::MAX)
-                            .await
-                            .unwrap()
-                            .to_vec(),
-                    )
-                    .unwrap(),
-                );
-            }
-        };
+                Err(err) => {
+                    errors.push(format!(
+                        "{}: {}",
+                        don.id,
+                        String::from_utf8(
+                            axum::body::to_bytes(err.into_body(), usize::MAX)
+                                .await
+                                .unwrap()
+                                .to_vec(),
+                        )
+                        .unwrap(),
+                    ));
+                }
+            };
+        }
+
+        page += 1;
     }
 
     let resp = if errors.is_empty() {

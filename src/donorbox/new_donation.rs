@@ -29,7 +29,7 @@ pub struct DonationEvent {
     campaign: Campaign,
     donor: super::Donor,
     net_amount: Decimal,
-    id: i32,
+    pub id: i32,
     formatted_net_amount: String,
     stripe_charge_id: String,
     #[serde(with = "time::serde::iso8601")]
