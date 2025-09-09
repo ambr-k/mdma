@@ -157,6 +157,7 @@ pub async fn process_donation(
             SELECT               id,        $2,          'donorbox',     $3,             $4
             FROM members
             WHERE email = $1
+                AND NOT EXISTS (SELECT 1 FROM payments WHERE payment_method = 'donorbox' AND transaction_id = $3)
         RETURNING id, member_id"#,
         event.donor.email,
         event.net_amount,
